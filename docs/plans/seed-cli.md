@@ -424,6 +424,12 @@ All must pass before close-out.
   `reader` / `resolver` / `writer` modules. Resolver is pure and now
   computes diffs, blast-radius counts, and preserved orphans against
   the normalized DB snapshot that `reader` returns.
+- 2026-04-21 — M4 landed: the CLI now reads the DB snapshot, resolves
+  the plan, supports `--dry-run`, and prints the human-readable
+  drift-visible report plus live-run summary. Npm on Windows strips
+  `--dry-run` from `process.argv`, so the entrypoint also honors
+  `npm_config_dry_run=true` to preserve the PM-locked invocation form
+  `npm run seed -- <path> --dry-run`.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its
