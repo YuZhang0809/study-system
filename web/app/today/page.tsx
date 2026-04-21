@@ -1,6 +1,6 @@
 import { Block } from "@/components/today/Block";
 import { BlockersBlock } from "@/components/daily-log/BlockersBlock";
-import { DailyLogCompose } from "@/components/daily-log/DailyLogCompose";
+import { EndOfDayEntry } from "@/components/daily-log/EndOfDayEntry";
 import { OpenItemsBlock } from "@/components/daily-log/OpenItemsBlock";
 import { YesterdayPromiseBlock } from "@/components/daily-log/YesterdayPromiseBlock";
 import { DrivingSeat } from "@/components/today/DrivingSeat";
@@ -9,8 +9,9 @@ import { FactStrip } from "@/components/today/FactStrip";
 import { RecentKnowledgeList } from "@/components/today/RecentKnowledgeList";
 import { Timeline } from "@/components/today/Timeline";
 import {
-  findCarriedForwardOpenItem,
   getTodayLog,
+  getTodayPlannedTasks,
+  getPreviousLocalDay,
   getYesterdayPromise,
   listActiveBlockers,
   listOpenItems,
@@ -48,6 +49,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const timeline = buildTimelineState(project, project.segments, today);
   const [
     todayPlan,
+    todayPlannedTasks,
     segmentCount,
     completedSegmentCount,
     recentKnowledge,
@@ -64,6 +66,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
         },
       },
     }),
+    getTodayPlannedTasks(project.id, today, prisma),
     prisma.planSegment.count({
       where: { projectId: project.id },
     }),
@@ -81,9 +84,6 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     listOpenItems(project.id, prisma),
     listActiveBlockers(project.id, prisma),
   ]);
-  const carriedForwardItem = yesterdayPromise
-    ? await findCarriedForwardOpenItem(project.id, yesterdayPromise.text, prisma)
-    : null;
 
   const segmentFactLabel = drivingSeat.activeSegment
     ? `${drivingSeat.activeSegment.name} 还剩`
@@ -92,15 +92,22 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     ? `${getDaysToPhaseEnd(drivingSeat.activeSegment.endDate, today)} 天`
     : "—";
   const todayLabel = `今日 ${formatIsoDate(today)}`;
-  const plannedTasks = Array.isArray(todayPlan?.plannedTasks)
-    ? todayPlan.plannedTasks.filter((task): task is string => typeof task === "string")
-    : [];
+  const dayIndex = drivingSeat.todayIndex ?? drivingSeat.daysSinceStart ?? 1;
+  const yesterday = getPreviousLocalDay(today);
 
   return (
     <div className="page">
       <div className="page-head">
         <h1 className="page-title">今日</h1>
         <span className="page-sub num">{formatIsoDate(today)}</span>
+        <EndOfDayEntry
+          projectId={project.id}
+          today={today}
+          dayIndex={dayIndex}
+          existingLog={todayLog}
+          todayPlannedTasks={todayPlannedTasks}
+          yesterdayPromiseText={yesterdayPromise?.text ?? null}
+        />
       </div>
 
       <div className="today-shell">
@@ -117,25 +124,15 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
         <div className="today-ledger">
           <div className="today-column">
-            <DailyLogCompose
-              key={`daily-log-${project.id}-${formatIsoDate(today)}-${todayLog?.updatedAt.toISOString() ?? "new"}`}
-              projectId={project.id}
-              today={today}
-              initialValues={todayLog}
-            />
             <Block heading="昨日之承诺 · 未结清">
-              <YesterdayPromiseBlock
-                projectId={project.id}
-                text={yesterdayPromise?.text ?? null}
-                canCarryForward={Boolean(yesterdayPromise) && !carriedForwardItem}
-              />
+              <YesterdayPromiseBlock text={yesterdayPromise?.text ?? null} yesterday={yesterday} />
             </Block>
             <Block heading={todayLabel} ruled>
               {todayPlan ? (
                 <>
                   <p className="today-day-title">{todayPlan.title}</p>
                   <ol className="today-list">
-                    {plannedTasks.map((task, index) => (
+                    {todayPlannedTasks.map((task, index) => (
                       <li key={`${todayPlan.id}-${index}`} className="today-list-item">
                         <span className="today-list-index">{index + 1}.</span>
                         <span>{task}</span>
@@ -161,7 +158,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
           <div className="today-column">
             <Block heading="未清账">
-              <OpenItemsBlock projectId={project.id} openItems={openItems} />
+              <OpenItemsBlock projectId={project.id} openItems={openItems} today={today} />
             </Block>
             <Block heading="阻塞">
               <BlockersBlock projectId={project.id} blockers={blockers} />
