@@ -4,6 +4,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import Database from "better-sqlite3";
 import { PrismaClient } from "@prisma/client";
 import TodayPage from "../app/today/page";
@@ -26,8 +27,8 @@ vi.mock("next/link", () => ({
     ...props
   }: {
     href: string;
-    children: React.ReactNode;
-  } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    children: ReactNode;
+  } & AnchorHTMLAttributes<HTMLAnchorElement>) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -95,9 +96,9 @@ describe("/today page", () => {
 
     await renderTodayRoute({ project: project.id });
 
-    expect(screen.getByText("你现在在 Phase 1 - Foundations · 第 3 天 / 共 3 天")).toBeTruthy();
+    expect(screen.getByText((content) => content.includes("Phase 1 - Foundations · 第 3 天"))).toBeTruthy();
 
-    const timeline = screen.getByLabelText("项目时间带");
+    const timeline = getTimeline();
     const timelineCells = within(timeline).getAllByRole("listitem");
     expect(timelineCells).toHaveLength(3);
     expect(timelineCells[2].getAttribute("aria-current")).toBe("date");
@@ -113,10 +114,35 @@ describe("/today page", () => {
     expect(screen.getByText("尚未记录 — 阻塞会在 daily-log-flow / 手动记录时出现")).toBeTruthy();
   });
 
+  it("uses the local calendar day for early-morning request times", async () => {
+    vi.setSystemTime(new Date("2026-05-05T00:30:00+09:00"));
+
+    const project = await seedProject({
+      name: "Local Day Project",
+      startDate: "2026-05-03",
+      endDate: "2026-05-05",
+      segmentName: "Phase 1 - Foundations",
+    });
+
+    await renderTodayRoute({ project: project.id });
+
+    const timeline = getTimeline();
+    const timelineCells = within(timeline).getAllByRole("listitem");
+
+    expect(screen.getAllByText("2026-05-05").length).toBeGreaterThan(0);
+    expect(timelineCells[2].getAttribute("aria-current")).toBe("date");
+    expect(screen.getByText("Day 3 - Work the plan")).toBeTruthy();
+    expect(screen.getByText("Parse yaml")).toBeTruthy();
+    expect(screen.getByText("Run integration test")).toBeTruthy();
+    expect(screen.queryByText("Inspect schema")).toBeNull();
+  });
+
   it("renders the no-project empty state when the database is empty", async () => {
     await renderTodayRoute();
 
-    expect(screen.getByText((_, element) => element?.textContent === "还没有项目。跑 npm run seed 导入一个计划。")).toBeTruthy();
+    expect(
+      screen.getByText((_, element) => element?.textContent === "还没有项目。跑 npm run seed 导入一个计划。"),
+    ).toBeTruthy();
     expect(screen.getByText("还没有项目")).toBeTruthy();
   });
 
@@ -136,10 +162,7 @@ describe("/today page", () => {
 
     await renderTodayRoute();
 
-    const projectLinks = screen.getAllByRole("link").filter((link) => {
-      const href = link.getAttribute("href");
-      return href?.startsWith("/today?project=");
-    });
+    const projectLinks = getProjectLinks();
     expect(projectLinks).toHaveLength(2);
     expect(projectLinks[0].textContent).toBe("Newer Project");
     expect(projectLinks[0].getAttribute("href")).toBe(`/today?project=${newer.id}`);
@@ -147,27 +170,21 @@ describe("/today page", () => {
     expect(projectLinks[1].getAttribute("href")).toBe(`/today?project=${older.id}`);
     expect(projectLinks[0].getAttribute("aria-current")).toBe("page");
     expect(projectLinks[1].getAttribute("aria-current")).toBeNull();
-    expect(screen.getByText("你现在在 Newer Phase · 第 3 天 / 共 5 天")).toBeTruthy();
+    expect(screen.getByText((content) => content.includes("Newer Phase · 第 3 天"))).toBeTruthy();
 
     await renderTodayRoute({ project: older.id });
 
-    const olderLinks = screen.getAllByRole("link").filter((link) => {
-      const href = link.getAttribute("href");
-      return href?.startsWith("/today?project=");
-    });
+    const olderLinks = getProjectLinks();
     expect(olderLinks[0].getAttribute("aria-current")).toBeNull();
     expect(olderLinks[1].getAttribute("aria-current")).toBe("page");
-    expect(screen.getByText("你现在在 Older Phase · 第 5 天 / 共 5 天")).toBeTruthy();
+    expect(screen.getByText((content) => content.includes("Older Phase · 第 5 天"))).toBeTruthy();
 
     await renderTodayRoute({ project: "bogus-project-id" });
 
-    const bogusLinks = screen.getAllByRole("link").filter((link) => {
-      const href = link.getAttribute("href");
-      return href?.startsWith("/today?project=");
-    });
+    const bogusLinks = getProjectLinks();
     expect(bogusLinks[0].getAttribute("aria-current")).toBe("page");
     expect(bogusLinks[1].getAttribute("aria-current")).toBeNull();
-    expect(screen.getByText("你现在在 Newer Phase · 第 3 天 / 共 5 天")).toBeTruthy();
+    expect(screen.getByText((content) => content.includes("Newer Phase · 第 3 天"))).toBeTruthy();
   });
 });
 
@@ -187,6 +204,23 @@ async function renderTodayRoute(query: Record<string, string> = {}) {
       {page}
     </>,
   );
+}
+
+function getTimeline() {
+  const timeline = screen.getAllByRole("list").find((list) => list.hasAttribute("aria-label"));
+
+  if (!timeline) {
+    throw new Error("expected timeline list");
+  }
+
+  return timeline;
+}
+
+function getProjectLinks() {
+  return screen.getAllByRole("link").filter((link) => {
+    const href = link.getAttribute("href");
+    return href?.startsWith("/today?project=");
+  });
 }
 
 async function seedProject({

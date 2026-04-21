@@ -5,7 +5,7 @@ import { FactStrip } from "@/components/today/FactStrip";
 import { Timeline } from "@/components/today/Timeline";
 import { getPrismaClient } from "@/lib/prisma";
 import { resolveActiveProject } from "@/lib/today/active-project";
-import { buildDrivingSeatState, formatIsoDate, getDaysToPhaseEnd, startOfDayUtc } from "@/lib/today/driving-seat";
+import { buildDrivingSeatState, formatIsoDate, getDaysToPhaseEnd, startOfLocalDay } from "@/lib/today/driving-seat";
 import { buildTimelineState } from "@/lib/today/timeline";
 
 interface TodayPageProps {
@@ -27,7 +27,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     );
   }
 
-  const today = startOfDayUtc(new Date());
+  const today = startOfLocalDay(new Date());
   const prisma = getPrismaClient();
   const drivingSeat = buildDrivingSeatState(project, project.segments, today);
   const timeline = buildTimelineState(project, project.segments, today);

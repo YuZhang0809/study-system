@@ -286,7 +286,7 @@ button {
 
 .proj-item:hover { background: var(--paper-2); }
 
-.proj-item[aria-current="true"] {
+.proj-item[aria-current="page"] {
   background: var(--paper-2);
   border-left-color: var(--amber);
 }

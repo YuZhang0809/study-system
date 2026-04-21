@@ -362,11 +362,13 @@ All must pass before close-out.
   1. With a freshly migrated DB and no seeded projects: `/today`
      renders the empty-state pointer to `npm run seed`.
   2. After `npm run seed -- tests/fixtures/seed-smoke.yaml`: `/today`
-     renders the driving-seat sentence, a 5-cell timeline with today
-     highlighted, the four-fact strip (facts #3 and #4 with real
-     values, #1 and #2 as `—`), and all five blocks with correct
-     empty-state / planned-tasks content.
-  3. Keyboard `2`–`5` / `,` still route correctly; `1` returns to
+     renders the driving-seat sentence and a 5-cell timeline band for
+     the fixture window. On 2026-04-21 specifically, because the
+     fixture starts on 2026-05-03, the correct result is the pre-start
+     branch (no highlighted today cell), facts #3 and #4 with real
+     values, facts #1 and #2 staying placeholders, and all five blocks with the
+     correct empty-state / planned-tasks content for that date.
+  3. Keyboard `2`-`5` / `,` still route correctly; `1` returns to
      `/today`. Paper-ruling overlay still visible.
 
 ## Open questions
@@ -442,6 +444,14 @@ _(Codex fills this in as M1–M6 land.)_
   unchanged shell keyboard shortcut listener, so this slice left that
   pre-existing behavior untouched and documented the limitation in
   `docs/STATE.md`.
+
+- 2026-04-21 - review follow-up landed: switched `/today`,
+  `driving-seat.ts`, and `timeline.ts` from UTC day bucketing to local
+  calendar-day bucketing, fixed the sidebar project selected-state CSS
+  selector to match `aria-current="page"`, added early-morning local
+  time coverage in the pure helpers plus `/today` integration, and
+  synced the stale Verification step above. Commit: current review-fix
+  head.
 
 ## Change Log
 

@@ -24,24 +24,28 @@ export interface DrivingSeatState {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function startOfDayUtc(value: Date): Date {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+function getLocalDayStamp(value: Date): number {
+  return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
 }
 
-export function differenceInDaysUtc(left: Date, right: Date): number {
-  return Math.round((startOfDayUtc(left).getTime() - startOfDayUtc(right).getTime()) / DAY_MS);
+export function startOfLocalDay(value: Date): Date {
+  return new Date(getLocalDayStamp(value));
 }
 
-export function sameDayUtc(left: Date, right: Date): boolean {
-  return startOfDayUtc(left).getTime() === startOfDayUtc(right).getTime();
+export function differenceInLocalDays(left: Date, right: Date): number {
+  return Math.round((getLocalDayStamp(left) - getLocalDayStamp(right)) / DAY_MS);
+}
+
+export function sameLocalDay(left: Date, right: Date): boolean {
+  return getLocalDayStamp(left) === getLocalDayStamp(right);
 }
 
 export function formatIsoDate(value: Date): string {
-  return startOfDayUtc(value).toISOString().slice(0, 10);
+  return startOfLocalDay(value).toISOString().slice(0, 10);
 }
 
 export function getDayIndex(startDate: Date, today: Date): number {
-  return differenceInDaysUtc(today, startDate) + 1;
+  return differenceInLocalDays(today, startDate) + 1;
 }
 
 export function getTotalProjectDays(project: Pick<DrivingSeatProject, "startDate" | "endDate">): number | null {
@@ -49,7 +53,7 @@ export function getTotalProjectDays(project: Pick<DrivingSeatProject, "startDate
     return null;
   }
 
-  return differenceInDaysUtc(project.endDate, project.startDate) + 1;
+  return differenceInLocalDays(project.endDate, project.startDate) + 1;
 }
 
 export function getDaysSinceStart(startDate: Date, today: Date): number {
@@ -57,7 +61,7 @@ export function getDaysSinceStart(startDate: Date, today: Date): number {
 }
 
 export function getDaysToPhaseEnd(endDate: Date, today: Date): number {
-  return differenceInDaysUtc(endDate, today);
+  return differenceInLocalDays(endDate, today);
 }
 
 export function findActiveSegment(
@@ -68,19 +72,19 @@ export function findActiveSegment(
     return null;
   }
 
-  const todayStamp = startOfDayUtc(today).getTime();
+  const todayStamp = startOfLocalDay(today).getTime();
   const sorted = [...segments].sort((left, right) => left.startDate.getTime() - right.startDate.getTime());
 
   for (const segment of sorted) {
-    const start = startOfDayUtc(segment.startDate).getTime();
-    const end = startOfDayUtc(segment.endDate).getTime();
+    const start = startOfLocalDay(segment.startDate).getTime();
+    const end = startOfLocalDay(segment.endDate).getTime();
 
     if (todayStamp >= start && todayStamp <= end) {
       return segment;
     }
   }
 
-  if (todayStamp < startOfDayUtc(sorted[0].startDate).getTime()) {
+  if (todayStamp < startOfLocalDay(sorted[0].startDate).getTime()) {
     return sorted[0];
   }
 
@@ -92,7 +96,7 @@ export function buildDrivingSeatState(
   segments: readonly DrivingSeatSegment[],
   today: Date,
 ): DrivingSeatState {
-  const daysUntilStart = differenceInDaysUtc(project.startDate, today);
+  const daysUntilStart = differenceInLocalDays(project.startDate, today);
 
   if (daysUntilStart > 0) {
     return {
@@ -255,9 +259,32 @@ if (import.meta.vitest) {
       expect(findActiveSegment(fullSegments, new Date("2026-05-01T00:00:00.000Z"))?.id).toBe("seg-1");
     });
 
+    it("uses the local calendar day for early-morning timestamps", () => {
+      const state = buildDrivingSeatState(
+        {
+          ...baseProject,
+          startDate: new Date("2026-04-19T00:00:00.000Z"),
+          endDate: new Date("2026-04-23T00:00:00.000Z"),
+        },
+        [
+          {
+            id: "seg-local",
+            name: "Phase Local",
+            startDate: new Date("2026-04-19T00:00:00.000Z"),
+            endDate: new Date("2026-04-23T00:00:00.000Z"),
+          },
+        ],
+        new Date("2026-04-21T00:30:00+09:00"),
+      );
+
+      expect(formatIsoDate(new Date("2026-04-21T00:30:00+09:00"))).toBe("2026-04-21");
+      expect(state.todayIndex).toBe(3);
+      expect(state.activeSegment?.id).toBe("seg-local");
+    });
+
     it("formats dates as ISO day strings", () => {
       expect(formatIsoDate(new Date("2026-05-05T08:30:00.000Z"))).toBe("2026-05-05");
-      expect(sameDayUtc(new Date("2026-05-05T00:00:00.000Z"), new Date("2026-05-05T23:59:59.000Z"))).toBe(true);
+      expect(sameLocalDay(new Date("2026-05-05T00:00:00+09:00"), new Date("2026-05-05T23:59:59+09:00"))).toBe(true);
     });
   });
 }

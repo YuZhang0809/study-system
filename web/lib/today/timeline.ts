@@ -1,4 +1,4 @@
-import { sameDayUtc, startOfDayUtc } from "./driving-seat";
+import { sameLocalDay, startOfLocalDay } from "./driving-seat";
 
 export interface TimelineProject {
   startDate: Date;
@@ -38,25 +38,25 @@ export function buildTimelineState(
   }
 
   const cells: TimelineCell[] = [];
-  const start = startOfDayUtc(project.startDate).getTime();
-  const end = startOfDayUtc(project.endDate).getTime();
+  const start = startOfLocalDay(project.startDate).getTime();
+  const end = startOfLocalDay(project.endDate).getTime();
   const phaseBoundaryStamps = new Set(
     segments
-      .map((segment) => startOfDayUtc(segment.startDate).getTime())
+      .map((segment) => startOfLocalDay(segment.startDate).getTime())
       .filter((stamp) => stamp !== start),
   );
 
   for (let stamp = start; stamp <= end; stamp += DAY_MS) {
     const date = new Date(stamp);
     const segment = segments.find((candidate) => {
-      const candidateStart = startOfDayUtc(candidate.startDate).getTime();
-      const candidateEnd = startOfDayUtc(candidate.endDate).getTime();
+      const candidateStart = startOfLocalDay(candidate.startDate).getTime();
+      const candidateEnd = startOfLocalDay(candidate.endDate).getTime();
       return stamp >= candidateStart && stamp <= candidateEnd;
     });
 
     cells.push({
       date,
-      isToday: sameDayUtc(date, today),
+      isToday: sameLocalDay(date, today),
       segmentId: segment?.id ?? null,
       isPhaseBoundary: phaseBoundaryStamps.has(stamp),
     });
@@ -128,6 +128,29 @@ if (import.meta.vitest) {
       );
 
       expect(state.cells.some((cell) => cell.isToday)).toBe(false);
+    });
+
+    it("marks the local calendar day for early-morning timestamps", () => {
+      const state = buildTimelineState(
+        {
+          startDate: new Date("2026-04-19T00:00:00.000Z"),
+          endDate: new Date("2026-04-23T00:00:00.000Z"),
+        },
+        [
+          {
+            id: "seg-local",
+            startDate: new Date("2026-04-19T00:00:00.000Z"),
+            endDate: new Date("2026-04-23T00:00:00.000Z"),
+          },
+        ],
+        new Date("2026-04-21T00:30:00+09:00"),
+      );
+
+      expect(state.cells[2]).toMatchObject({
+        isToday: true,
+        segmentId: "seg-local",
+      });
+      expect(state.cells.filter((cell) => cell.isToday)).toHaveLength(1);
     });
   });
 }

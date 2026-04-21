@@ -121,11 +121,11 @@ must be idempotent, UI in Simplified Chinese.
 
 ## Verification Snapshot
 
-As of 2026-04-21 after `today-page-skeleton` M1-M6:
+As of 2026-04-21 after `today-page-skeleton` review follow-ups:
 
 - `cd web && npm run typecheck` - green
 - `cd web && npm run lint` - green
-- `cd web && npm test` - 20 test files, 73 tests, all green
+- `cd web && npm test` - 20 test files, 76 tests, all green
 - `cd web && npm run build` - green; `/today` now builds as dynamic
   while the other seven routes remain static
 - Manual `/today` smoke on `npm run dev` against a freshly migrated
@@ -135,7 +135,7 @@ As of 2026-04-21 after `today-page-skeleton` M1-M6:
   `cd web && npm run seed -- tests/fixtures/seed-smoke.yaml` - green
   for the actual fixture dates on 2026-04-21: the page renders the
   pre-start driving-seat sentence, the 5-cell timeline band, fact-strip
-  values `— / — / 13 days / 3 segments / 0 completed`, and the
+  values `placeholder / placeholder / 13 days / 3 segments / 0 completed`, and the
   `Today 2026-04-21` block falls back to the contract's not-scheduled
   copy because the fixture starts on 2026-05-03
 - Sidebar project selection was rechecked in a real browser:
@@ -204,3 +204,6 @@ Deferred inside v1 but planned:
 - `export-json-cli` (required before dogfood-trust)
 - Footer date reactivity (currently server-rendered only, fine for v1
   preview but will need client refresh when real content lands)
+
+
+
