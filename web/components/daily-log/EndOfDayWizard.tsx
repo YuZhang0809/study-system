@@ -141,22 +141,24 @@ function buildInitialStep2Entries(
   existingLog: DailyLogRecord | null,
   yesterdayPromiseText: string | null,
 ): Step2Entry[] {
+  const initialText = normalizeText(yesterdayPromiseText);
+  const step2Entries = initialText ? [createStep2Entry(initialText)] : [];
+  const seenTexts = initialText ? new Set([initialText]) : new Set<string>();
+
   if (!existingLog) {
-    const initialText = normalizeText(yesterdayPromiseText);
-    return initialText ? [createStep2Entry(initialText)] : [];
+    return step2Entries;
   }
 
   const representedPlannedSkips = new Map<string, number>();
 
   // Edit-mode reconstruction is intentionally lossy: planned rows stay in step 1,
   // while only skipped items not already represented by an unchecked plan row reopen in step 2.
+  // Yesterday's promise still anchors the first skipped row even when editing an existing log.
   for (const entry of step1Entries) {
     if (entry.origin === "plan" && !entry.checked) {
       incrementCount(representedPlannedSkips, entry.text);
     }
   }
-
-  const step2Entries: Step2Entry[] = [];
 
   for (const rawText of existingLog.whatSkipped) {
     const text = normalizeText(rawText);
@@ -169,6 +171,11 @@ function buildInitialStep2Entries(
       continue;
     }
 
+    if (seenTexts.has(text)) {
+      continue;
+    }
+
+    seenTexts.add(text);
     step2Entries.push(createStep2Entry(text));
   }
 
@@ -289,7 +296,7 @@ export function EndOfDayWizard({
     return () => {
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [closeOnEscape]);
+  }, []);
 
   function clearMessages() {
     if (submitError) {

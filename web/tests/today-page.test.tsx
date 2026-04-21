@@ -16,7 +16,6 @@ let currentPathname = "/today";
 
 vi.mock("@/lib/daily-log/actions", () => ({
   upsertDailyLog: vi.fn(async () => ({ ok: true })),
-  carryForwardYesterdayPromise: vi.fn(async () => ({ ok: true })),
   createOpenItem: vi.fn(async () => ({ ok: true })),
   closeOpenItem: vi.fn(async () => ({ ok: true })),
   createBlocker: vi.fn(async () => ({ ok: true })),
@@ -95,7 +94,7 @@ afterEach(async () => {
 });
 
 describe("/today page", () => {
-  it("renders the active project shell, timeline, compose card, and block empty states", async () => {
+  it("renders the active project shell, page-head button, and block empty states", async () => {
     const project = await seedProject({
       name: "Today Project",
       startDate: "2026-05-03",
@@ -117,8 +116,8 @@ describe("/today page", () => {
     expect(screen.getByText("Parse yaml")).toBeTruthy();
     expect(screen.getByText("Run integration test")).toBeTruthy();
 
-    expect(screen.getByText("今日日志 · 2026-05-05")).toBeTruthy();
-    expect(screen.getByText("今日还未写")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /今日收工/i })).toBeTruthy();
+    expect(screen.queryByText("今日日志 · 2026-05-05")).toBeNull();
     expect(screen.getByText("昨日未留下第一件事")).toBeTruthy();
     expect(screen.getByText("尚未记录 · 用 /knowledge 新建第一条")).toBeTruthy();
     expect(screen.getByText("无未清账")).toBeTruthy();
@@ -243,10 +242,12 @@ describe("/today page", () => {
 
     await renderTodayRoute({ project: project.id });
 
-    expect(screen.getByText("今日 · 120 分 · 2 做 · 1 跳过")).toBeTruthy();
-    expect(screen.getByText("展开修改")).toBeTruthy();
-    expect(screen.getByText("写完 retro plan")).toBeTruthy();
-    expect(screen.getByText("记为未清账")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /修改今日/i })).toBeTruthy();
+
+    const promiseBlock = getBlockByHeading("昨日之承诺 · 未结清");
+    expect(within(promiseBlock).getByText((content) => content.includes("写完 retro plan"))).toBeTruthy();
+    expect(within(promiseBlock).getByText("未兑现")).toBeTruthy();
+    expect(within(promiseBlock).queryByRole("button", { name: /记为未清账/i })).toBeNull();
 
     const openItemsBlock = getBlockByHeading("未清账");
     expect(within(openItemsBlock).getByText("跟进 Prisma 错误")).toBeTruthy();

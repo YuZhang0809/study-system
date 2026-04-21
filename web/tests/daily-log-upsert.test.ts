@@ -126,6 +126,44 @@ describe("upsertDailyLog", () => {
     expect(await prisma.dailyLog.count()).toBe(0);
     expect(revalidatePath).not.toHaveBeenCalled();
   });
+
+  it("accepts a realistic wizard-derived payload", async () => {
+    const project = await seedProject("Wizard Payload Project");
+    const checklistRows = [
+      { text: "Parse yaml", checked: true },
+      { text: "Run integration test", checked: false },
+      { text: "Investigate lock timing", checked: true },
+    ];
+    const skippedRows = [{ text: "写完 retro plan" }];
+
+    const whatDone = checklistRows.filter((row) => row.checked).map((row) => row.text);
+    const whatSkipped = [
+      ...checklistRows.filter((row) => !row.checked).map((row) => row.text),
+      ...skippedRows.map((row) => row.text),
+    ];
+
+    await expect(
+      upsertDailyLog(
+        buildFormData({
+          projectId: project.id,
+          date: "2026-05-05",
+          whatDone,
+          whatSkipped,
+          timeSpentMinutes: "175",
+          tomorrowFirstThing: "09:00 打开 particles/bench.ts,先跑 baseline 再改代码",
+          honestyNote: "今天在绕开最难的那一块。",
+        }),
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    const log = await prisma.dailyLog.findFirstOrThrow({
+      where: { projectId: project.id },
+    });
+
+    expect(log.whatDone).toEqual(["Parse yaml", "Investigate lock timing"]);
+    expect(log.whatSkipped).toEqual(["Run integration test", "写完 retro plan"]);
+    expect(log.timeSpentMinutes).toBe(175);
+  });
 });
 
 function buildFormData(input: {
