@@ -430,6 +430,11 @@ All must pass before close-out.
   `--dry-run` from `process.argv`, so the entrypoint also honors
   `npm_config_dry_run=true` to preserve the PM-locked invocation form
   `npm run seed -- <path> --dry-run`.
+- 2026-04-21 — M5 landed: added the smoke fixture plus
+  `web/tests/seed-cli.test.ts` covering dry-run, first live seed,
+  idempotent re-seed, loud updates, segment/day blast-radius output,
+  orphan preservation, and the guarantee that user tables never gain
+  or lose rows across seed runs.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its

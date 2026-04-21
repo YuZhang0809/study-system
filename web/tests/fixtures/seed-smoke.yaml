@@ -1,0 +1,53 @@
+project:
+  name: "Seed Smoke Project"
+  start_date: 2026-05-03
+  end_date: 2026-05-07
+  has_plan_structure: full
+  status: active
+segments:
+  - order: 1
+    name: "Phase 1 - Foundations"
+    start_date: 2026-05-03
+    end_date: 2026-05-04
+    goals:
+      - "Read the repo contract"
+      - "Land the scaffold"
+  - order: 2
+    name: "Phase 2 - CLI Wiring"
+    start_date: 2026-05-05
+    end_date: 2026-05-06
+    goals:
+      - "Wire the seed pipeline"
+  - order: 3
+    name: "Phase 3 - Closure"
+    start_date: 2026-05-07
+    end_date: 2026-05-07
+    goals:
+      - "Close the slice"
+days:
+  - date: 2026-05-03
+    segment_order: 1
+    title: "Day 1 - Read the contract"
+    planned_tasks:
+      - "Read PRD"
+      - "Read STATE"
+  - date: 2026-05-04
+    segment_order: 1
+    title: "Day 2 - Validate the shell"
+    planned_tasks:
+      - "Inspect schema"
+  - date: 2026-05-05
+    segment_order: 2
+    title: "Day 3 - Wire the CLI"
+    planned_tasks:
+      - "Parse yaml"
+  - date: 2026-05-06
+    segment_order: 2
+    title: "Day 4 - Test drift"
+    planned_tasks:
+      - "Run integration test"
+  - date: 2026-05-07
+    segment_order: 3
+    title: "Day 5 - Close the slice"
+    planned_tasks:
+      - "Write closure note"
