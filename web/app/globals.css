@@ -576,6 +576,15 @@ button {
   line-height: 1.5;
 }
 
+.today-day-title {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
 .today-shell {
   display: flex;
   flex-direction: column;

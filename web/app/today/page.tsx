@@ -3,6 +3,7 @@ import { DrivingSeat } from "@/components/today/DrivingSeat";
 import { Fact } from "@/components/today/Fact";
 import { FactStrip } from "@/components/today/FactStrip";
 import { Timeline } from "@/components/today/Timeline";
+import { getPrismaClient } from "@/lib/prisma";
 import { resolveActiveProject } from "@/lib/today/active-project";
 import { buildDrivingSeatState, formatIsoDate, getDaysToPhaseEnd, startOfDayUtc } from "@/lib/today/driving-seat";
 import { buildTimelineState } from "@/lib/today/timeline";
@@ -27,8 +28,30 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   }
 
   const today = startOfDayUtc(new Date());
+  const prisma = getPrismaClient();
   const drivingSeat = buildDrivingSeatState(project, project.segments, today);
   const timeline = buildTimelineState(project, project.segments, today);
+  const [todayPlan, segmentCount, completedSegmentCount] = await Promise.all([
+    prisma.planDay.findUnique({
+      where: {
+        projectId_date: {
+          projectId: project.id,
+          date: today,
+        },
+      },
+    }),
+    prisma.planSegment.count({
+      where: { projectId: project.id },
+    }),
+    prisma.planSegment.count({
+      where: {
+        projectId: project.id,
+        endDate: {
+          lt: today,
+        },
+      },
+    }),
+  ]);
   const segmentFactLabel = drivingSeat.activeSegment
     ? `${drivingSeat.activeSegment.name} 还剩`
     : "当前阶段";
@@ -36,6 +59,9 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
     ? `${getDaysToPhaseEnd(drivingSeat.activeSegment.endDate, today)} 天`
     : "—";
   const todayLabel = `今日 ${formatIsoDate(today)}`;
+  const plannedTasks = Array.isArray(todayPlan?.plannedTasks)
+    ? todayPlan.plannedTasks.filter((task): task is string => typeof task === "string")
+    : [];
 
   return (
     <div className="page">
@@ -52,7 +78,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             <Fact label="累计 commits" value="—" />
             <Fact label="连续写 log" value="—" />
             <Fact label={segmentFactLabel} value={segmentFactValue} />
-            <Fact label="阶段统计" value="—" />
+            <Fact label={`${segmentCount} 个阶段 /`} value={`${completedSegmentCount} 个已完成`} />
           </FactStrip>
         </section>
 
@@ -62,7 +88,21 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               <p className="today-empty">尚未记录 — daily-log-flow 落地后会显示昨日留下的第一件事</p>
             </Block>
             <Block heading={todayLabel} ruled>
-              <p className="today-empty">{todayLabel} — 未排入计划</p>
+              {todayPlan ? (
+                <>
+                  <p className="today-day-title">{todayPlan.title}</p>
+                  <ol className="today-list">
+                    {plannedTasks.map((task, index) => (
+                      <li key={`${todayPlan.id}-${index}`} className="today-list-item">
+                        <span className="today-list-index">{index + 1}.</span>
+                        <span>{task}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              ) : (
+                <p className="today-empty">{todayLabel} — 未排入计划</p>
+              )}
             </Block>
           </div>
 
