@@ -14,6 +14,15 @@ import { createAppPrismaClient } from "../lib/prisma";
 let currentSearchParams = new URLSearchParams();
 let currentPathname = "/today";
 
+vi.mock("@/lib/daily-log/actions", () => ({
+  upsertDailyLog: vi.fn(async () => ({ ok: true })),
+  carryForwardYesterdayPromise: vi.fn(async () => ({ ok: true })),
+  createOpenItem: vi.fn(async () => ({ ok: true })),
+  closeOpenItem: vi.fn(async () => ({ ok: true })),
+  createBlocker: vi.fn(async () => ({ ok: true })),
+  resolveBlocker: vi.fn(async () => ({ ok: true })),
+}));
+
 vi.mock("next/navigation", () => ({
   useSearchParams: () => currentSearchParams,
   usePathname: () => currentPathname,
@@ -86,7 +95,7 @@ afterEach(async () => {
 });
 
 describe("/today page", () => {
-  it("renders the active project shell, timeline, planned tasks, and block empty states", async () => {
+  it("renders the active project shell, timeline, compose card, and block empty states", async () => {
     const project = await seedProject({
       name: "Today Project",
       startDate: "2026-05-03",
@@ -108,10 +117,12 @@ describe("/today page", () => {
     expect(screen.getByText("Parse yaml")).toBeTruthy();
     expect(screen.getByText("Run integration test")).toBeTruthy();
 
-    expect(screen.getByText("尚未记录 · daily-log-flow 落地后会显示昨日留下的第一件事")).toBeTruthy();
+    expect(screen.getByText("今日日志 · 2026-05-05")).toBeTruthy();
+    expect(screen.getByText("今日还未写")).toBeTruthy();
+    expect(screen.getByText("昨日未留下第一件事")).toBeTruthy();
     expect(screen.getByText("尚未记录 · 用 /knowledge 新建第一条")).toBeTruthy();
-    expect(screen.getByText("尚未记录 · daily-log-flow 落地后会挂出未结清条目")).toBeTruthy();
-    expect(screen.getByText("尚未记录 · 阻塞会在 daily-log-flow / 手动记录时出现")).toBeTruthy();
+    expect(screen.getByText("无未清账")).toBeTruthy();
+    expect(screen.getByText("无阻塞")).toBeTruthy();
   });
 
   it("uses the local calendar day for early-morning request times", async () => {
@@ -166,6 +177,83 @@ describe("/today page", () => {
     expect(within(recentBlock).getByText("BUG")).toBeTruthy();
     expect(within(recentBlock).getByText("Parser trims the trailing slash")).toBeTruthy();
     expect(within(recentBlock).getByText("今日")).toBeTruthy();
+  });
+
+  it("renders the populated daily-log surfaces when rows exist", async () => {
+    const project = await seedProject({
+      name: "Populated Daily Log Project",
+      startDate: "2026-05-03",
+      endDate: "2026-05-05",
+      segmentName: "Phase 1 - Foundations",
+    });
+
+    await prisma.dailyLog.create({
+      data: {
+        projectId: project.id,
+        date: new Date("2026-05-05T00:00:00.000Z"),
+        whatDone: ["写 action", "补页面"],
+        whatSkipped: ["整理 CSS"],
+        timeSpentMinutes: 120,
+        tomorrowFirstThing: "把测试补全",
+        honestyNote: null,
+        createdAt: new Date("2026-05-05T01:00:00.000Z"),
+        updatedAt: new Date("2026-05-05T01:30:00.000Z"),
+      },
+    });
+
+    await prisma.dailyLog.create({
+      data: {
+        projectId: project.id,
+        date: new Date("2026-05-04T00:00:00.000Z"),
+        whatDone: ["读计划"],
+        whatSkipped: [],
+        timeSpentMinutes: 60,
+        tomorrowFirstThing: "写完 retro plan",
+        honestyNote: null,
+      },
+    });
+
+    await prisma.openItem.createMany({
+      data: [
+        {
+          projectId: project.id,
+          text: "跟进 Prisma 错误",
+          openedAt: new Date("2026-05-05T00:00:00.000Z"),
+          source: "manual",
+          status: "open",
+        },
+        {
+          projectId: project.id,
+          text: "补充页面文案",
+          openedAt: new Date("2026-05-04T00:00:00.000Z"),
+          source: "daily_log",
+          status: "open",
+        },
+      ],
+    });
+
+    await prisma.blocker.create({
+      data: {
+        projectId: project.id,
+        text: "等待 Prisma 锁问题定位",
+        openedAt: new Date("2026-05-05T00:00:00.000Z"),
+        resolvedAt: null,
+      },
+    });
+
+    await renderTodayRoute({ project: project.id });
+
+    expect(screen.getByText("今日 · 120 分 · 2 做 · 1 跳过")).toBeTruthy();
+    expect(screen.getByText("展开修改")).toBeTruthy();
+    expect(screen.getByText("写完 retro plan")).toBeTruthy();
+    expect(screen.getByText("记为未清账")).toBeTruthy();
+
+    const openItemsBlock = getBlockByHeading("未清账");
+    expect(within(openItemsBlock).getByText("跟进 Prisma 错误")).toBeTruthy();
+    expect(within(openItemsBlock).getByText("补充页面文案")).toBeTruthy();
+
+    const blockersBlock = getBlockByHeading("阻塞");
+    expect(within(blockersBlock).getByText("等待 Prisma 锁问题定位")).toBeTruthy();
   });
 
   it("renders the no-project empty state when the database is empty", async () => {
