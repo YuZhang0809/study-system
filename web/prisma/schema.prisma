@@ -1,0 +1,191 @@
+// Study-system data model.
+// PRD §3 is the source of truth. Enum-style fields live as String
+// columns (SQLite has no native enums) and are validated at the
+// Zod boundary — see web/lib/schemas/.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 removed `url` from schema-file datasources; see
+// prisma.config.ts at the web/ root for the connection URL.
+datasource db {
+  provider = "sqlite"
+}
+
+model Project {
+  id               String    @id @default(cuid())
+  name             String
+  startDate        DateTime
+  endDate          DateTime?
+  hasPlanStructure String
+  status           String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  segments       PlanSegment[]
+  planDays       PlanDay[]
+  dailyLogs      DailyLog[]
+  weeklyLogs     WeeklyLog[]
+  knowledgeItems KnowledgeItem[]
+  openItems      OpenItem[]
+  blockers       Blocker[]
+  bookmarks      Bookmark[]
+}
+
+model PlanSegment {
+  id        String   @id @default(cuid())
+  projectId String
+  order     Int
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  goals     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project   @relation(fields: [projectId], references: [id])
+  days    PlanDay[]
+  retro   Retro?
+
+  @@index([projectId])
+}
+
+model PlanDay {
+  id           String   @id @default(cuid())
+  segmentId    String?
+  projectId    String
+  date         DateTime
+  title        String
+  plannedTasks Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  segment PlanSegment? @relation(fields: [segmentId], references: [id])
+  project Project      @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, date])
+  @@index([segmentId])
+}
+
+model DailyLog {
+  id                 String   @id @default(cuid())
+  projectId          String
+  date               DateTime
+  whatDone           Json
+  whatSkipped        Json
+  timeSpentMinutes   Int
+  tomorrowFirstThing String
+  honestyNote        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, date])
+}
+
+model WeeklyLog {
+  id          String   @id @default(cuid())
+  projectId   String
+  weekStart   DateTime
+  reflections Json
+  selfScores  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, weekStart])
+}
+
+model Retro {
+  id             String   @id @default(cuid())
+  segmentId      String   @unique
+  metrics        Json
+  selfScores     Json
+  threeQuestions Json
+  scopeChanges   Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  segment PlanSegment @relation(fields: [segmentId], references: [id])
+}
+
+model KnowledgeItem {
+  id        String   @id @default(cuid())
+  projectId String
+  type      String
+  title     String
+  slug      String
+  bodyMd    String
+  tags      Json
+  metadata  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, slug])
+  @@index([projectId, type])
+}
+
+// Polymorphic pointer. No FK: ownerType + ownerId reference any of
+// the other tables by string. Enforced at the Zod / service layer,
+// not at the DB. Covered in docs/plans/scaffold-and-schema.md M5.
+model Artifact {
+  id        String   @id @default(cuid())
+  ownerType String
+  ownerId   String
+  kind      String
+  urlOrPath String
+  title     String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerType, ownerId])
+}
+
+model OpenItem {
+  id        String   @id @default(cuid())
+  projectId String
+  text      String
+  openedAt  DateTime
+  source    String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, status])
+}
+
+model Blocker {
+  id         String    @id @default(cuid())
+  projectId  String
+  text       String
+  openedAt   DateTime
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, resolvedAt])
+}
+
+model Bookmark {
+  id         String   @id @default(cuid())
+  projectId  String
+  label      String
+  targetType String
+  targetId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}

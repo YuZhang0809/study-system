@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Next.js
+web/.next/
+web/out/
+
+# Local SQLite dev DB (schema + migration SQL stay in git)
+web/prisma/dev.db
+web/prisma/dev.db-journal
+web/prisma/tmp-*.db
+web/prisma/tmp-*.db-journal
+
+# Environment files
+.env
+.env.local
+.env.*.local
+web/.env
+web/.env.local
+web/.env.*.local
+
+# Test + coverage
+coverage/
+web/coverage/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local tooling state
+.claude/

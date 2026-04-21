@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>学习管理 — study-system</title>
+  <meta name="viewport" content="width=1440, initial-scale=1" />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="seed.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="src/primitives.jsx"></script>
+  <script type="text/babel" src="src/Today.jsx"></script>
+  <script type="text/babel" src="src/Plan.jsx"></script>
+  <script type="text/babel" src="src/Knowledge.jsx"></script>
+  <script type="text/babel" src="src/Retros.jsx"></script>
+  <script type="text/babel" src="src/EndOfDay.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ---- Tweaks defaults (persisted by host) ----
+    const TWEAKS = /*EDITMODE-BEGIN*/{
+      "todayLayout": "ledger",          // ledger | stacked | column
+      "knowledgeInput": "drawer",       // inline | modal | drawer
+      "endOfDayMode": "wizard"          // wizard | single
+    }/*EDITMODE-END*/;
+
+    const NAV = [
+      { id: "today",     label: "今日",     kbd: "1", icon: "today" },
+      { id: "plan",      label: "计划",     kbd: "2", icon: "plan" },
+      { id: "knowledge", label: "知识库",   kbd: "3", icon: "knowledge" },
+      { id: "retros",    label: "复盘",     kbd: "4", icon: "retros" },
+      { id: "artifacts", label: "产出",     kbd: "5", icon: "artifacts" },
+      { id: "settings",  label: "设置",     kbd: ",", icon: "settings" }
+    ];
+
+    function Sidebar({ activeProjectId, onPickProject, activeNav, onPickNav }) {
+      return (
+        <aside className="sidebar">
+          <div className="brand">
+            <span className="brand-mark">S/S</span>
+            <span className="brand-name">学习系统</span>
+          </div>
+
+          <div>
+            <div className="section-label">项目</div>
+            <ul className="proj-list">
+              {window.SEED.projects.map(p => (
+                <li key={p.id} className="proj-item"
+                    aria-current={p.id === activeProjectId}
+                    onClick={() => onPickProject(p.id)}>
+                  <span className="proj-name">{p.name}</span>
+                  <span className="proj-meta num">
+                    {p.status === "active"    && `d${p.today_index}/${p.total_days} · active`}
+                    {p.status === "pre_start" && `starts ${p.start_date}`}
+                  </span>
+                </li>
+              ))}
+              <li className="proj-item" style={{ color: "var(--ink-4)" }}>
+                <span className="proj-name" style={{ color: "var(--ink-4)" }}>
+                  + 新建项目 (seed yaml)
+                </span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <div className="section-label">视图</div>
+            <ul className="nav">
+              {NAV.map(n => (
+                <li key={n.id} className="nav-item"
+                    aria-current={activeNav === n.id}
+                    onClick={() => onPickNav(n.id)}>
+                  <Icon name={n.icon} size={13} stroke="currentColor" />
+                  <span>{n.label}</span>
+                  <span className="kbd">{n.kbd}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div style={{ marginTop: "auto", padding: "12px 16px 14px",
+                        borderTop: "1px solid var(--rule)", color: "var(--ink-3)" }}>
+            <div className="mono t-xs caps" style={{ marginBottom: 6 }}>本地 · SQLite</div>
+            <div className="mono t-xs ink-4 num">最后备份 · 2026-04-20 23:01</div>
+            <div className="mono t-xs ink-4 num">数据库 · 1.2 MB</div>
+          </div>
+        </aside>
+      );
+    }
+
+    function Header({ proj, nav }) {
+      const label = NAV.find(n => n.id === nav)?.label || nav;
+      return (
+        <header className="app-header">
+          <div className="crumbs">
+            <span className="mono ink-4">{proj.id === "p_webgpu" ? "webgpu-30d" : "agentic-90d"}</span>
+            <span className="crumb-sep">/</span>
+            <span className="crumb-cur">{label}</span>
+            {nav === "today" && (
+              <>
+                <span className="crumb-sep">·</span>
+                <span className="mono ink-3 num">
+                  {proj.today_snapshot?.date} {dayOfWeek(proj.today_snapshot?.date)} · d{proj.today_snapshot?.day_index}
+                </span>
+              </>
+            )}
+          </div>
+          <div className="header-right">
+            <button className="header-btn">
+              <Icon name="search" size={12} /> search <span className="kbd">⌘K</span>
+            </button>
+            <button className="header-btn">
+              <Icon name="plus" size={12} /> new <span className="kbd">N</span>
+            </button>
+          </div>
+        </header>
+      );
+    }
+
+    function Footer({ proj, nav }) {
+      return (
+        <div className="footer">
+          <span>STATUS <span style={{ color: "var(--done)" }}>●</span> committed</span>
+          <span>·</span>
+          <span>项目 {proj.id}</span>
+          <span>·</span>
+          <span>视图 {nav}</span>
+          <span>·</span>
+          <span>AI 关闭（v1 只预览）</span>
+          <span style={{ marginLeft: "auto" }}>2026-04-21 · local</span>
+        </div>
+      );
+    }
+
+    function TweaksPanel({ active, onActive, tweaks, setTweaks }) {
+      if (!active) return null;
+      const set = (k, v) => {
+        const next = { ...tweaks, [k]: v };
+        setTweaks(next);
+        try {
+          window.parent.postMessage({ type: "__edit_mode_set_keys", edits: { [k]: v } }, "*");
+        } catch (e) {}
+      };
+      const opts = (key, values) => (
+        <div className="tweak-opts">
+          {values.map(v => (
+            <button key={v} aria-selected={tweaks[key] === v} onClick={() => set(key, v)}>{v}</button>
+          ))}
+        </div>
+      );
+      return (
+        <div className="tweaks">
+          <div className="tweaks-head">
+            <span>调整</span>
+            <span style={{ cursor: "pointer" }} onClick={() => onActive(false)}>×</span>
+          </div>
+          <div className="tweaks-body">
+            <div className="tweak-row">
+              <span>今日 · 布局</span>
+              {opts("todayLayout", ["ledger","stacked","column"])}
+            </div>
+            <div className="tweak-row">
+              <span>知识库 · 录入方式</span>
+              {opts("knowledgeInput", ["inline","modal","drawer"])}
+            </div>
+            <div className="tweak-row">
+              <span>End-of-day · mode</span>
+              {opts("endOfDayMode", ["wizard","single"])}
+            </div>
+            <div style={{ fontSize: "var(--t-xs)", color: "var(--ink-4)", lineHeight: 1.5 }}>
+              Tweaks 切换视觉 / 交互变体 · 不切换功能。<br/>
+              关掉 Tweaks 即为默认视图。
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [tweaks, setTweaks] = useState(() => {
+        try { return { ...TWEAKS, ...JSON.parse(localStorage.getItem("ss.tweaks") || "{}") }; }
+        catch (e) { return TWEAKS; }
+      });
+      const [activeProjectId, setActiveProjectId] = useState(() =>
+        localStorage.getItem("ss.proj") || window.SEED.activeProjectId);
+      const [nav, setNav] = useState(() => localStorage.getItem("ss.nav") || "today");
+      const [eod, setEod] = useState(false);
+      const [tweakOpen, setTweakOpen] = useState(false);
+
+      // persist
+      useEffect(() => { localStorage.setItem("ss.proj", activeProjectId); }, [activeProjectId]);
+      useEffect(() => { localStorage.setItem("ss.nav", nav); }, [nav]);
+      useEffect(() => { localStorage.setItem("ss.tweaks", JSON.stringify(tweaks)); }, [tweaks]);
+
+      // edit-mode handshake
+      useEffect(() => {
+        const onMsg = (e) => {
+          if (!e.data) return;
+          if (e.data.type === "__activate_edit_mode")   setTweakOpen(true);
+          if (e.data.type === "__deactivate_edit_mode") setTweakOpen(false);
+        };
+        window.addEventListener("message", onMsg);
+        try { window.parent.postMessage({ type: "__edit_mode_available" }, "*"); } catch (err) {}
+        return () => window.removeEventListener("message", onMsg);
+      }, []);
+
+      // keyboard nav
+      useEffect(() => {
+        const onKey = (e) => {
+          if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+          const k = e.key;
+          const idx = { "1":"today","2":"plan","3":"knowledge","4":"retros","5":"artifacts" }[k];
+          if (idx) setNav(idx);
+          if (k === "," && (e.metaKey || e.ctrlKey)) setNav("settings");
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+      }, []);
+
+      const proj = window.SEED.projects.find(p => p.id === activeProjectId);
+
+      return (
+        <div className="app" data-screen-label="app">
+          <Sidebar activeProjectId={activeProjectId}
+                   onPickProject={setActiveProjectId}
+                   activeNav={nav}
+                   onPickNav={setNav} />
+          <div className="main">
+            <Header proj={proj} nav={nav} />
+            <div className="app-body">
+              {nav === "today"     && <TodayPage proj={proj} layout={tweaks.todayLayout}
+                                                  onEndOfDay={() => setEod(true)} />}
+              {nav === "plan"      && <PlanPage proj={proj} />}
+              {nav === "knowledge" && <KnowledgePage proj={proj} inputMode={tweaks.knowledgeInput} />}
+              {nav === "retros"    && <RetrosPage proj={proj} />}
+              {nav === "artifacts" && <ArtifactsStub proj={proj} />}
+              {nav === "settings"  && <SettingsStub />}
+            </div>
+          </div>
+          <Footer proj={proj} nav={nav} />
+
+          {eod && <EndOfDay proj={proj} mode={tweaks.endOfDayMode} onClose={() => setEod(false)} />}
+
+          <TweaksPanel active={tweakOpen} onActive={setTweakOpen} tweaks={tweaks} setTweaks={setTweaks} />
+        </div>
+      );
+    }
+
+    function ArtifactsStub({ proj }) {
+      const seeds = [
+        { kind: "commit",     url: "github.com/me/webgpu-30d/commit/a4f2b1", owner: "learning_024", at: "2026-04-20 17:30" },
+        { kind: "screenshot", url: "screenshots/2026-04-19/safari-sb.png",  owner: "bug_022",      at: "2026-04-19 14:02" },
+        { kind: "chat",       url: "claude.ai/chat/9c2a—WGSL-storage",      owner: "prompt_023",   at: "2026-04-20 11:12" },
+        { kind: "commit",     url: "github.com/me/webgpu-30d/commit/77be0c", owner: "bug_022",     at: "2026-04-19 18:44" },
+        { kind: "note",       url: "notes/bind-group-sketch.jpg",           owner: "learning_021", at: "2026-04-18 20:11" }
+      ];
+      return (
+        <div className="page">
+          <div className="page-head">
+            <h1 className="page-title">产出</h1>
+            <span className="page-sub num">{seeds.length} 条指针 · app 不存内容,只存指针</span>
+          </div>
+          <table className="ledger">
+            <thead>
+              <tr><th style={{width:80}}>类型</th><th>URL / 路径</th><th style={{width:140}}>附挂于</th><th style={{width:130}}>时间</th></tr>
+            </thead>
+            <tbody>
+              {seeds.map((a, i) => (
+                <tr key={i}>
+                  <td><span className="chip">{a.kind}</span></td>
+                  <td className="mono ink-2" style={{wordBreak:"break-all"}}>{a.url}</td>
+                  <td className="mono ink-3">{a.owner}</td>
+                  <td className="mono ink-3 num">{a.at}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    function SettingsStub() {
+      return (
+        <div className="page">
+          <div className="page-head">
+            <h1 className="page-title">设置</h1>
+            <span className="page-sub num">v1 · 只预览</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 900 }}>
+            <div className="card" style={{ padding: "14px 18px" }}>
+              <BlockLabel>AI roles · v1 全部关闭</BlockLabel>
+              {[
+                ["Coach · 尖锐追问","v2"],
+                ["Historian · 跨时间一致性","v2"],
+                ["Scout · 预告下阶段风险","v2"],
+                ["Principle mirror · 反射你的元原则","v2"]
+              ].map(([k,v]) => (
+                <div key={k} style={{ display: "flex", padding: "6px 0", borderTop: "1px dashed var(--rule)",
+                                       alignItems: "center" }}>
+                  <span className="serif" style={{ fontSize: "var(--t-md)" }}>{k}</span>
+                  <span className="mono t-xs ink-4" style={{ marginLeft: "auto" }}>{v}</span>
+                </div>
+              ))}
+              <div className="mono t-xs ink-4" style={{ marginTop: 10 }}>
+                v1 只做"反射镜" · 把你已经产生的数据还给你 · 不替你写
+              </div>
+            </div>
+            <div className="card" style={{ padding: "14px 18px" }}>
+              <BlockLabel>数据</BlockLabel>
+              <div className="mono t-sm" style={{ lineHeight: 1.7 }}>
+                <div>数据库 · <span className="ink-3">~/.study-system/data.db</span></div>
+                <div>size · <span className="num">1.2 MB</span></div>
+                <div>last backup · <span className="num">2026-04-20 23:01</span></div>
+                <div>next auto-backup · <span className="num">tonight 23:00</span></div>
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                <button className="btn">导出 JSON</button>
+                <button className="btn">导入 YAML</button>
+                <button className="btn">打开目录</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <script type="application/json" id="speaker-notes">[]</script>
+</body>
+</html>
