@@ -141,34 +141,145 @@ function normalizePrismaError(error: unknown): SeedError | null {
   return new SeedError(
     4,
     "database uniqueness conflict while writing seed plan",
-    formatUniqueConstraintDetails(error.meta?.target),
+    formatUniqueConstraintDetails(error),
     error,
   );
 }
 
-function formatUniqueConstraintDetails(target: unknown): string[] {
-  if (Array.isArray(target) && target.every((value) => typeof value === "string")) {
-    const fields = [...target].sort();
-    if (fields.length === 1 && fields[0] === "name") {
-      return ["project.name must remain unique"];
-    }
+function formatUniqueConstraintDetails(error: Prisma.PrismaClientKnownRequestError): string[] {
+  const modelName = extractMetaString(error.meta, "modelName") ?? parseModelFromOriginalMessage(error.meta);
+  const fields = extractConstraintFields(error);
+  const knownConstraint = describeKnownConstraint(modelName, fields);
 
-    if (fields.length === 2 && fields[0] === "order" && fields[1] === "projectId") {
-      return ["plan_segment(projectId, order) must remain unique"];
-    }
+  if (knownConstraint) {
+    return [knownConstraint];
+  }
 
-    if (fields.length === 2 && fields[0] === "date" && fields[1] === "projectId") {
-      return ["plan_day(projectId, date) must remain unique"];
-    }
+  const originalMessage = extractOriginalDriverMessage(error.meta);
+  if (originalMessage) {
+    return [`unique constraint failed: ${originalMessage}`];
+  }
 
+  if (fields.length > 0) {
     return [`unique constraint target: ${fields.join(", ")}`];
   }
 
-  if (typeof target === "string" && target.length > 0) {
-    return [`unique constraint target: ${target}`];
+  return ["the database rejected a duplicate natural key"];
+}
+
+function describeKnownConstraint(modelName: string | null, fields: string[]): string | null {
+  const normalizedFields = [...fields].sort().join(",");
+
+  if (modelName === "Project" && normalizedFields === "name") {
+    return "project.name must remain unique";
   }
 
-  return ["the database rejected a duplicate natural key"];
+  if (modelName === "PlanSegment" && normalizedFields === "order,projectId") {
+    return "plan_segment(projectId, order) must remain unique";
+  }
+
+  if (modelName === "PlanDay" && normalizedFields === "date,projectId") {
+    return "plan_day(projectId, date) must remain unique";
+  }
+
+  return null;
+}
+
+function extractConstraintFields(error: Prisma.PrismaClientKnownRequestError): string[] {
+  const targetFields = normalizeFieldList(readNestedValue(error.meta, ["target"]));
+  if (targetFields.length > 0) {
+    return targetFields;
+  }
+
+  const adapterFields = normalizeFieldList(
+    readNestedValue(error.meta, ["driverAdapterError", "cause", "constraint", "fields"]),
+  );
+  if (adapterFields.length > 0) {
+    return adapterFields;
+  }
+
+  const messageFields = parseFieldsFromText(error.message);
+  if (messageFields.length > 0) {
+    return messageFields;
+  }
+
+  return parseFieldsFromText(extractOriginalDriverMessage(error.meta));
+}
+
+function normalizeFieldList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const fields = value.filter((item): item is string => typeof item === "string");
+  return fields.length === value.length ? fields : [];
+}
+
+function parseFieldsFromText(value: unknown): string[] {
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  const fieldSectionIndex = value.lastIndexOf("fields:");
+  const fieldSection = fieldSectionIndex === -1 ? value : value.slice(fieldSectionIndex);
+  const matches = [...fieldSection.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+  if (matches.length > 0) {
+    return matches;
+  }
+
+  const originalMessageMatch = value.match(/UNIQUE constraint failed:\s*(.+)$/);
+  if (!originalMessageMatch) {
+    return [];
+  }
+
+  return originalMessageMatch[1]
+    .split(",")
+    .map((entry) => entry.trim().split(".").at(-1) ?? "")
+    .filter((entry) => entry.length > 0);
+}
+
+function extractOriginalDriverMessage(meta: unknown): string | null {
+  return extractNestedString(meta, ["driverAdapterError", "cause", "originalMessage"]);
+}
+
+function parseModelFromOriginalMessage(meta: unknown): string | null {
+  const originalMessage = extractOriginalDriverMessage(meta);
+  if (!originalMessage) {
+    return null;
+  }
+
+  const match = originalMessage.match(/UNIQUE constraint failed:\s*([^.]+)\./);
+  return match?.[1] ?? null;
+}
+
+function extractMetaString(meta: unknown, key: string): string | null {
+  if (!isRecord(meta)) {
+    return null;
+  }
+
+  return typeof meta[key] === "string" ? meta[key] : null;
+}
+
+function extractNestedString(value: unknown, path: string[]): string | null {
+  const nested = readNestedValue(value, path);
+  return typeof nested === "string" ? nested : null;
+}
+
+function readNestedValue(value: unknown, path: string[]): unknown {
+  let current: unknown = value;
+
+  for (const key of path) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[key];
+  }
+
+  return current;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 async function main(): Promise<SeedExitCode> {

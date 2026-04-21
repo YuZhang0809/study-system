@@ -57,7 +57,19 @@ describe("seed CLI", () => {
           status: "draft",
         },
       }),
-    ).rejects.toMatchObject({ code: "P2002" });
+    ).rejects.toMatchObject({
+      code: "P2002",
+      meta: {
+        modelName: "Project",
+        driverAdapterError: {
+          cause: {
+            constraint: {
+              fields: ["name"],
+            },
+          },
+        },
+      },
+    });
   });
 
   it("enforces segment order uniqueness within a project at the database layer", async () => {
@@ -93,7 +105,57 @@ describe("seed CLI", () => {
           goals: ["second"],
         },
       }),
-    ).rejects.toMatchObject({ code: "P2002" });
+    ).rejects.toMatchObject({
+      code: "P2002",
+      meta: {
+        modelName: "PlanSegment",
+        driverAdapterError: {
+          cause: {
+            constraint: {
+              fields: ["projectId", "order"],
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("inserts a second project when the yaml project name is different", async () => {
+    expectSuccess(runSeed([fixturePath]));
+
+    const secondProjectYaml = writePlanFile(
+      "second-project.yaml",
+      fixtureYaml.replace('name: "Seed Smoke Project"', 'name: "Second Seed Smoke Project"'),
+    );
+
+    const run = runSeed([secondProjectYaml]);
+    expectSuccess(run);
+    expect(run.stdout).toContain('project "Second Seed Smoke Project"  INSERT');
+    expect(run.stdout).toContain("summary: inserted 9 / updated 0 / noop 0 / orphans 0");
+    expect(await planCounts()).toEqual({ projects: 2, segments: 6, days: 10 });
+  });
+
+  it("updates the existing project when the yaml name matches and project fields drift", async () => {
+    expectSuccess(runSeed([fixturePath]));
+
+    const updatedProjectYaml = writePlanFile(
+      "updated-project.yaml",
+      fixtureYaml.replace("start_date: 2026-05-03", "start_date: 2026-05-02"),
+    );
+
+    const run = runSeed([updatedProjectYaml]);
+    expectSuccess(run);
+    expect(run.stdout).toContain('project "Seed Smoke Project"  UPDATE');
+    expect(run.stdout).toContain("startDate  2026-05-03 -> 2026-05-02");
+    expect(run.stdout).toContain("summary: inserted 0 / updated 1 / noop 8 / orphans 0");
+
+    const projects = await prisma.project.findMany({
+      where: { name: "Seed Smoke Project" },
+      select: { startDate: true },
+    });
+    expect(projects).toHaveLength(1);
+    expect(projects[0].startDate.toISOString().slice(0, 10)).toBe("2026-05-02");
+    expect(await planCounts()).toEqual({ projects: 1, segments: 3, days: 5 });
   });
 
   it("seeds the smoke fixture, reruns idempotently, and preserves user tables", async () => {
