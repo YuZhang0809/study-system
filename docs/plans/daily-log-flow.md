@@ -1,508 +1,648 @@
 # ExecPlan — daily-log-flow
 
-**Status:** open
-**Owner (impl):** Codex (to be handed off)
+**Status:** open (direction change 2026-04-22 — rework in flight)
+**Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-21
-**Target close:** 2026-04-24 (≈ 1–2 working sessions)
+**Target close:** 2026-04-25 (≈ 1 more working session on top of
+the 355e704 baseline)
 
-## Goal
+## Change log
 
-After this slice lands, `/today` stops relying on empty-state copy in
-its main ledger and becomes the working driving seat for the day. The
-page gains four live surfaces:
+- **2026-04-21** — Plan drafted (v1). Codex landed M1–M4 at head
+  `355e704` (107 tests green). Shape: inline compose card on
+  `/today` left column, `[记为未清账]` carry-forward button on
+  `昨日之承诺`, `+ 新增` + `[关闭]` / `[解除]` on 未清账 / 阻塞.
+- **2026-04-22** — PM direction change. Design prototypes
+  `docs/design/study-system/project/src/EndOfDay.jsx` +
+  `Today.jsx` were **not read** before v1 drafting. The product
+  intent per design is a **four-step wizard modal** triggered by
+  a top-right `今日收工 ⌘↵` button, not an inline card; the
+  `昨日之承诺` block is **read-only** (no carry-forward button —
+  the flow-forward happens inside wizard step 2). This plan is
+  now v2: the data layer and OpenItem/Blocker write UX survive;
+  the compose surface and `[记为未清账]` path are superseded.
+  Milestones M5–M8 below carry the rework. M1–M4 Progress log is
+  preserved at the bottom for git history alignment.
 
-1. **`今日日志` inline compose** — an inline compose card on `/today`
-   for the day's `daily_log` row. Not filled today → expanded form;
-   already filled → collapsed one-line summary that can re-expand for
-   edits. Upsert keyed on `(projectId, date)`.
-2. **`昨日之承诺` block** — reads yesterday's
-   `daily_log.tomorrowFirstThing`, renders it as a read-only string
-   with one adjacent action button `[记为未清账]` that creates an
-   `OpenItem` row carrying that text forward. No "done / not done"
-   checkmarks.
-3. **`未清账` block** — lists the project's `status = "open"`
-   `OpenItem` rows with inline `+ 新增` (creates a new row) and
-   `[关闭]` per row (sets `status = "done"`).
-4. **`阻塞` block** — lists the project's unresolved `Blocker` rows
-   (`resolvedAt IS NULL`) with inline `+ 新增` and `[解除]` per row
-   (sets `resolvedAt = now()`).
+## Goal (v2)
+
+After this slice lands, `/today` gains:
+
+1. A top-right `今日收工 ⌘↵` primary button that opens a four-step
+   `EndOfDay` wizard modal. On final submit, the wizard upserts
+   one `DailyLog` row per `(projectId, date)`.
+2. Step 1 ("做了什么") pre-populates from today's
+   `PlanDay.plannedTasks` as a checklist. Checked rows → `whatDone`;
+   unchecked rows → `whatSkipped`. User can add off-plan rows via
+   `+ 加一条(计划外的也写上)`.
+3. Step 2 ("偏离") is a text-only list (no reason field, per
+   PM-Q2). Pre-filled with one row = yesterday's
+   `tomorrowFirstThing` if yesterday's log exists and its text is
+   non-empty. All entries append to `whatSkipped` on submit.
+4. Step 3 ("时间") is a number input + quick-preset chips
+   (`30 / 60 / 90 / 120 / 150 / 180 / 240`). No analytics
+   (7-day average / median are parked per PM-Q4).
+5. Step 4 is `明日第一件事` (required) + optional `诚实便签`.
+6. `昨日之承诺` block becomes **read-only**: renders yesterday's
+   `tomorrowFirstThing` + muted `未兑现` label. No button, no
+   carry-forward action. The forward-flow happens via wizard
+   step 2 (pre-population) or via `未清账` `+ 新增` (manual).
+7. `未清账` + `阻塞` blocks keep `+ 新增` inline row + per-row
+   `[关闭]` / `[解除]` (PM-Q3 γ: explicit deviation from design,
+   which shows these blocks as read-only — reason documented in
+   the anti-pattern check below).
+8. Top-right `+ 记一条 N` button is rendered but **inert** (global
+   `N` shortcut stays parked from `knowledge-capture-inline`).
 
 The existing `DrivingSeat` / `Timeline` / `FactStrip` / `最近动静`
-wiring stays as-is. The fact-strip's `累计 commits` read remains
-parked.
+wiring stays as-is. The fact-strip's `累计 commits` /
+`连续写 log` reads remain parked.
 
 ## Context
 
 - Preceding slice:
   [`knowledge-capture-inline`](./archive/knowledge-capture-inline.md)
-  closed 2026-04-21 with a narrow fix-up review cycle. `/today`
-  already has live project resolution via `?project=<id>`, a sidebar
-  switcher, and a populated `最近动静` feed. This slice extends the
-  same per-block pattern to three more blocks and adds the
-  `今日日志` compose.
-- Design anchors:
-  - No dedicated design prototype for the `/today` compose card.
-    Visual tokens are inherited from
-    [`docs/decisions/0001-design-handoff-reference.md`](../decisions/0001-design-handoff-reference.md)
-    — paper-ledger aesthetic, amber-only accent, `drift = dusty
-    brick` muted copy, `done = muted sage`. Compose chrome mirrors
-    the knowledge-capture card: `card` class, amber top rule, 12/16
-    padding.
-  - `web/components/knowledge/InlineCompose.tsx` is the reference
-    implementation for an inline compose client component with a
-    server action submit path. This slice does not share code with
-    it directly (the field shapes differ) but mirrors the shape.
+  closed 2026-04-21. `/today` has live project resolution via
+  `?project=<id>`, a sidebar switcher, and a populated `最近动静`
+  feed.
+- v1 implementation (355e704) stands on top of the above. This v2
+  plan reshapes the v1 compose surface but keeps everything else.
+- Design anchors (**both are authoritative**):
+  - `docs/design/study-system/project/src/EndOfDay.jsx` — the
+    four-step wizard. Implementation target is the
+    `EndOfDayWizard` function only; the sibling `EndOfDaySingle`
+    (single-page variant) is a Tweaks-axis alternative and is
+    explicitly dropped for v1 (same rule as
+    `knowledge-capture-inline`: Tweaks axis is out for v1).
+  - `docs/design/study-system/project/src/Today.jsx` — layout is
+    the `"ledger"` variation (the `stacked` and `column`
+    variations are also Tweaks-axis alternatives, dropped).
+    Today.jsx is the source for the top-right
+    `今日收工 ⌘↵` + `+ 记一条 N` button pair and the
+    `TodayBlockPromises` (read-only) shape.
+  - [`docs/decisions/0001-design-handoff-reference.md`](../decisions/0001-design-handoff-reference.md)
+    — visual tokens. Card chrome, amber accent, `drift = dusty
+    brick`, `done = muted sage`, `check`/`check--done`/`check--drift`
+    classes, no italics, no emoji.
+  - `web/components/knowledge/InlineCompose.tsx` — reference for
+    the client-component + server-action pattern; the wizard
+    mirrors the same boundary (no Prisma in client, submit via a
+    `"use server"` module).
 - PRD anchors:
-  - §3 D-3 — `daily_log` columns are fixed: `whatDone`,
-    `whatSkipped`, `timeSpentMinutes`, `tomorrowFirstThing`,
-    `honestyNote`. Explicitly no free-form overflow field.
-  - §3 D-4 — `open_item` / `blocker` / `bookmark` are the
-    driving-seat surfaces. This slice wires two of the three; the
-    `bookmark` surface is deferred.
-  - §1 anti-patterns — the carry-forward button is named
-    `记为未清账`, not `✓ 做到了 / ✗ 没做到`, to stay on the
-    non-cheerleader side of the line. The form has zero pre-fill.
-    There is no "streak kept" / "great honesty!" copy.
-  - §5 — v1 has **no LLM**. No suggestion chips, no AI-assisted
-    anything.
+  - §3 D-3 — `daily_log` columns are fixed. The wizard's four
+    steps map to the same five columns:
+    `whatDone` (step 1 checked + step 1 added), `whatSkipped`
+    (step 1 unchecked + step 2 entries), `timeSpentMinutes`
+    (step 3), `tomorrowFirstThing` (step 4a), `honestyNote`
+    (step 4b). No new columns.
+  - §3 D-4 — `open_item` / `blocker` are the
+    driving-seat surfaces. `/today` wires both with
+    create+close/resolve per PM-Q3 γ.
+  - §1 anti-patterns — detailed re-check below.
+  - §5 — no v1 LLM.
   - §7 MVP item 2 — "每日 log 必须结构化"; MVP item 4 — "未清账 /
     阻塞 要能在 /today 上看到".
   - §8 acceptance — "能每天记一条 daily_log"; "/today 能展示未清账
     与阻塞"; "昨日承诺滚动展现".
-- Downstream dependency: `retro-flow` will read `DailyLog` rows by
-  segment range to populate the phase retro's "what actually
-  happened" column. No reshape is needed — the `DailyLog` table is
-  already the durable record.
+- Downstream dependency: `retro-flow` reads `DailyLog` by segment
+  range. No reshape needed.
 
-### PM-confirmed choices (locked before Codex handoff)
+### PM-confirmed choices (v2 — locked 2026-04-22)
 
-_All confirmed by PM 2026-04-21._
+_Supersedes v1 choices 1–9. Numbering restarts._
 
-1. **Input mode is `inline` only** (Q1 = B). The `今日日志` compose
-   is a card at the top of `/today`'s left column. No separate
-   `/today/log/new` route. Collapsed state is a one-line summary
-   (`今日 · {minutes} 分 · {doneCount} 做 · {skippedCount} 跳过`); a
-   small `[展开修改]` link re-expands the form. Expanded state shows
-   the five PRD-fixed fields. Submit upserts on
-   `(projectId, date)`.
-2. **`昨日之承诺` carry-forward is a single `[记为未清账]` button**
-   (Q2 = B). The button sits next to the rendered string. On click,
-   the server action creates one `OpenItem` row with:
-   - `text = yesterday.tomorrowFirstThing`
-   - `openedAt = startOfLocalDay(today)`
-   - `source = "daily_log"`
-   - `status = "open"`
-   
-   The row immediately appears in the `未清账` block below. The
-   button is **not** a "done" affordance — there is no
-   `[✓ 做到了]` counterpart. If the user did it, they reference it
-   in today's `whatDone` themselves. This is deliberate and covered
-   by the anti-pattern check.
-3. **`未清账` / `阻塞` are read + new + close only** (Q3 = B). No
-   edit-text flow, no reopen flow, no filter/sort UI, no pagination.
-   Each block renders an inline `+ 新增` row (one text input +
-   `[添加]` button; Enter submits) and a `[关闭]` / `[解除]` button
-   per row. `OpenItem` close uses `status = "done"` (not "dropped",
-   which is reserved for "give up on this entirely" and is a later
-   slice's UI). `Blocker` close writes `resolvedAt = now()`.
-4. **`whatDone` / `whatSkipped` are chip editors.** Same shape as
-   the knowledge-capture tag chip editor: `+ 一项 ↵` input pushes
-   a chip on Enter; `×` removes a chip. Max 20 chips per list.
-   Each chip 1–200 chars after trimming. No comma-split, no
-   auto-dedupe. The list is stored as a plain string array
-   (`Json`) — matches the existing `dailyLogCreate` Zod shape.
-5. **`timeSpentMinutes` is a plain `number` input** with min=0,
-   step=15. Placeholder `120`. No time-tracker UI, no
-   start/stop — the user types their own number honestly.
-6. **`honestyNote` is an optional textarea** (3 rows, compact).
-   Placeholder copy `{无则留空} · 今日有什么没讲出来的?`. No
-   prompt suggestions.
-7. **Date semantics.** "Today" = `startOfLocalDay(new Date())` —
-   reuse the existing helper in `web/lib/today/driving-seat.ts`.
-   "Yesterday" = today − 1 day. No timezone config: same machine,
-   same user. Yesterday-promise query is
-   `DailyLog.findUnique({ projectId_date: { projectId, date:
-   yesterday } })`.
-8. **Empty states.**
-   - No today log → compose card expanded, summary hidden.
-   - No yesterday log OR yesterday log had empty
-     `tomorrowFirstThing` → block body shows muted
-     `昨日未留下第一件事`. Button does not render.
-   - Zero open items → block body shows muted `无未清账`. `+ 新增`
-     row still renders.
-   - Zero active blockers → block body shows muted `无阻塞`.
-     `+ 新增` row still renders.
-9. **Layout.** Left column of `today-ledger`, top-to-bottom:
-   (a) `今日日志` compose card, (b) `昨日之承诺`, (c) existing
-   `今日 YYYY-MM-DD` (planned tasks, unchanged). Middle column
-   stays `最近动静`. Right column stays `未清账` + `阻塞` (now
-   populated). No other restructure.
+1. **Input mode is the four-step wizard** (PM-Q1 = confirmed).
+   Trigger: top-right `今日收工 ⌘↵` primary button on `/today`'s
+   page-head. Click opens a full-scrim modal (width ≈ 760 per
+   design). Esc closes without saving. Click-outside the modal
+   card also closes without saving. Step breadcrumb renders all
+   four titles across the top; past steps carry a muted check
+   mark (`done` color per decision 0001). Footer has `← back`
+   (disabled on step 1) and `next →` (steps 1–3) / `Commit log
+   ⌘↵` (step 4).
+   If today already has a `DailyLog`, the button label flips to
+   `修改今日 ⌘↵` and the wizard opens with existing values
+   pre-filled.
+
+2. **`昨日之承诺` block is read-only** (Q2 revised). Render
+   yesterday's `tomorrowFirstThing` string with a muted `未兑现`
+   drift label (right-aligned). No button. No carry-forward
+   affordance. If the user wants the text tracked as debt, they
+   either (a) edit / keep it in wizard step 2 when they 收工, or
+   (b) type it into `未清账 + 新增` row manually.
+
+3. **`未清账` / `阻塞` keep `+ 新增` + `[关闭]` / `[解除]`**
+   (PM-Q3 = γ). **Deviation from design** (which shows these as
+   read-only). Reason: the design leaves OpenItem / Blocker
+   lifecycle unspecified; v1 needs a concrete, testable write
+   path for dogfood. Behavior: inline text-only add row per
+   block (Enter or `[添加]` submits); per-row `[关闭]` sets
+   `OpenItem.status = "done"`; per-row `[解除]` sets
+   `Blocker.resolvedAt = now()`. `status = "dropped"` stays
+   parked. No edit / reopen flow.
+
+4. **Step 1 checklist source = today's `PlanDay.plannedTasks`.**
+   For each planned task, render one unchecked row. The
+   `+ 加一条(计划外的也写上)` row appends a user-typed entry
+   that defaults to **checked** (post-hoc capture = presumed
+   done). If today has no `PlanDay` row, step 1 opens with just
+   the add row. If `plannedTasks` is an empty array, same.
+
+5. **Step 1 output mapping.** On submit:
+   - Every row whose check box is TRUE → text → `whatDone[]`
+     (trimmed).
+   - Every row whose check box is FALSE → text → `whatSkipped[]`
+     (trimmed).
+   - Step 2 entries append to `whatSkipped[]` after step 1
+     contributions.
+   - No auto-dedup across step 1 unchecked + step 2 entries.
+   - Each row's text is 1–200 chars after trim; empty rows
+     silently dropped.
+
+6. **Step 2 has NO reason field** (PM-Q2 = no). Each step-2 row
+   is a single text input. Pre-populated state:
+   - If yesterday's daily_log exists AND
+     `yesterday.tomorrowFirstThing.trim().length > 0`, step 2
+     starts with one row whose text = yesterday's
+     `tomorrowFirstThing`. User can edit or delete.
+   - Otherwise step 2 starts empty.
+   - `+ 再加一条` appends an empty row.
+   - The design's hint line `昨日承诺 2 条未兑现 · 会被自动归入
+     这里的"推迟"` is **adapted** to a single-line pre-population
+     for v1 (v1 has no weekly promise source; the only
+     yesterday-carry candidate is `tomorrowFirstThing`).
+
+7. **Step 3: preset chips kept, analytics parked** (PM-Q4).
+   - Number input, right-aligned, large mono font, suffix
+     `分钟` per design.
+   - Preset row below: 7 chip buttons `30m / 60m / 90m / 120m /
+     150m / 180m / 240m`. Clicking sets the number value.
+   - **Do not render** the design's `最近 7 天均值 · 中位数`
+     line. Parked (needs an analytics read layer).
+   - Value is `timeSpentMinutes: z.number().int().nonnegative()`
+     per existing Zod schema.
+
+8. **Step 4 fields.**
+   - `明日第一件事 · 具体动作` — single-line text input,
+     autofocus when step 4 opens, placeholder per design
+     (`09:00 打开 particles/bench.ts,先跑 baseline 再改代码`).
+     Required, trimmed, 1–240 chars.
+   - `诚实日记 · 写给明早的自己 · 可以留空` — 3-row textarea,
+     optional, placeholder per design
+     (`今天我没做到 X,因为… / 我在逃避 Y / 这个节奏还能扛几天?`),
+     max 2000 chars.
+   - Design's hint line under `明日第一件事`
+     (`会钉在明早 Today 页顶 · 晚上 app 会问你做了没`) is **not
+     implemented**. The "晚上 app 会问你做了没" behavior is a
+     future notification surface; the "钉在明早 Today 页顶"
+     behavior is already how the `昨日之承诺` block works. Render
+     a shorter muted hint: `明早 /today 顶部会看到这句话`.
+
+9. **`+ 记一条 N` top-right button is rendered but INERT.**
+   Button HTML exists; `disabled` attribute is set; tooltip
+   reads `N 快捷键待定 · 先从 /knowledge 新建`. Do not wire a
+   global `N` keyboard listener.
+
+10. **Date semantics unchanged from v1.** "Today" =
+    `startOfLocalDay(new Date())`. "Yesterday" = today − 1 day.
+
+11. **Layout.** `today-ledger` stays three-column. Left column
+    top-to-bottom: (a) `昨日之承诺` (read-only variant),
+    (b) existing `今日 · {ISO}` block (PlanDay.plannedTasks; stays
+    **read-only**, no mid-day checkbox — see §Non-goals).
+    Middle column: `最近动静`. Right column: `未清账` + `阻塞`
+    (both with `+ 新增` + close buttons per PM-Q3 γ).
+    **Remove the inline compose card** that M1–M4 put at the top
+    of the left column — superseded.
+
+12. **Wizard state persistence.** None. Closing the modal mid-way
+    discards wizard state. Revisit if dogfood shows pain.
+
+13. **Wizard as client component.** The wizard is a client
+    component mounted from `/today/page.tsx` via a thin client
+    wrapper (`EndOfDayEntry.tsx`) that holds the open/close
+    state and the `今日收工` button. All submit calls go through
+    `upsertDailyLog` in `web/lib/daily-log/actions.ts`. No new
+    API routes.
 
 ## Constraints
 
-### Anti-pattern check (PRD §1)
+### Anti-pattern check (v2)
 
-- **not a tutor** — the page renders the user's own typed strings
-  and lets them type more. No canonical definitions, no "how to
-  reflect" copy, no coaching prompts.
-- **not a ghostwriter** — `whatDone` / `whatSkipped` start empty;
-  `tomorrowFirstThing` starts empty; `honestyNote` starts empty. No
-  prior-day carry-forward into today's `whatDone`. The
-  `[记为未清账]` button carries an exact user-typed string from
-  yesterday into `OpenItem.text` verbatim — no rewording, no
-  normalization. No LLM.
-- **not a cheerleader** — no streak counters, no "great honesty
-  today!" copy, no done-row celebration. The `[关闭]` button fades
-  the row (muted sage) per decision 0001 and removes it from the
-  `status = "open"` list on next render; there is no animated check
-  or colored success state. `[记为未清账]` names the debt, does not
-  celebrate completion.
-- **not a planner** — the form does not recommend what to do
-  tomorrow, does not summarize today, does not score the day. The
-  user types every content field.
+- **not a tutor** — the wizard renders the user's own typed text
+  and lets them type more. No glossary, no coaching prompts.
+- **not a ghostwriter** — step 1 pre-fills from
+  `PlanDay.plannedTasks` which the user authored via
+  `npm run seed`. Step 2 pre-fills from yesterday's user-typed
+  `tomorrowFirstThing`. Both are re-surfacing the user's own
+  prior authorship, not system-generated text. No LLM, no network
+  call. Still passes.
+- **not a cheerleader** — wizard submit closes the modal without
+  confetti, toast, or congratulatory copy. Step 1 check
+  strike-through is a factual mark-as-done (same visual as the
+  `未清账` `[关闭]` fade), not celebration. No streak counter,
+  no "great honesty" copy. The `未兑现` label on 昨日之承诺 is
+  explicitly drift-colored (dusty brick), the opposite of
+  celebration. Still passes.
+- **not a planner** — wizard does not recommend what to do
+  tomorrow, does not summarize today, does not score the day.
+  The `明日第一件事` placeholder is an example-shape, not a
+  recommendation. Still passes.
 
 Passes all four.
 
 ### Preserved invariants
 
 - No runtime LLM. No network calls. All data comes from Prisma.
-- No schema changes. This slice writes to `DailyLog`, `OpenItem`,
-  and `Blocker` using the columns already shipped in the init
-  migration.
-- Apple system font stack, amber-only accent, drift = dusty brick,
-  done = muted sage, no italics, no emoji (decision 0001).
+- No schema changes. All writes use the columns already shipped
+  in the init migration.
+- Apple system font stack, amber-only accent, drift = dusty
+  brick, done = muted sage, no italics, no emoji.
 - UI copy in Simplified Chinese; code, comments, identifiers in
   English.
-- `/today` remains a server component at the page level. The
-  compose card and the inline `+ 新增` rows are the only client
-  boundaries in this slice; all of them take data as props and do
-  no Prisma imports.
-- Submit paths write through Next.js 16 server actions — no new
-  API routes. Every server action validates input at the Zod
-  boundary before Prisma write.
+- `/today` remains a server component at the page level. Client
+  boundaries in this slice: `EndOfDayEntry.tsx` (wrapper),
+  `EndOfDayWizard.tsx` (modal), the four step components, and
+  the existing `AddOpenItemRow` / `CloseOpenItemButton` /
+  `AddBlockerRow` / `ResolveBlockerButton` from M1–M4. None
+  import Prisma.
+- Submit writes through Next.js 16 server actions — no new API
+  routes. Every server action validates at the Zod boundary.
 - `web/AGENTS.md` signals "This is NOT the Next.js you know";
   Codex must read `web/node_modules/next/dist/docs/` before
   writing server actions, async page components, or client
   boundaries.
 
-### Non-goals for this slice
+### Non-goals for this slice (v2)
 
-- No edit flow for `DailyLog` beyond same-day upsert. Past-day
-  logs are not editable from `/today`.
-- No past-day view (no `/today/history`, no `/today?date=…`). The
-  `最近动静` block is the only window backward.
-- No edit / reopen flow for `OpenItem` or `Blocker`. Write a new
-  row if you mis-typed.
-- No `Bookmark` UI. The schema stays unused by this slice.
-- No `+ 新增` variant with type-badge, source-dropdown, or priority
-  field. Text-only.
-- No "link an artifact to this daily log" UI. (Artifact pointers
-  are scoped to `KnowledgeItem` for now.)
-- No global `N` shortcut wiring. The slice adds its own buttons.
-- No population of the fact-strip's `累计 commits` / `连续写 log`
-  reads. These remain `—`; they are a later Today-polish slice.
-- No toast / banner confirmation. Success is conveyed by the form
-  collapsing and the list refreshing.
+- No inline checkbox on `/today` `今日 · {ISO}` planned-tasks
+  block. (Design shows it; v1 ships the block read-only. Only
+  the wizard step 1 has checkboxes. Revisit if dogfood shows
+  mid-day interactivity pain.)
+- No draft persistence for an in-progress wizard — closing the
+  modal discards state.
+- No 7-day time average / median (parked per PM-Q4).
+- No active `N` keyboard shortcut wiring. `+ 记一条` is inert.
+- No past-day view of daily_log.
+- No `Bookmark` UI.
+- No edit / reopen flow for `OpenItem` / `Blocker`.
+- No `OpenItem.status = "dropped"` UI.
+- No Tweaks-axis toggling (single-page variant of EndOfDay, or
+  `stacked` / `column` variants of Today layout).
+- No fact-strip changes; `累计 commits` and `连续写 log` stay
+  `—`.
+- No "link an artifact to this daily log" UI.
+- No wizard-side notification scaffolding. Design's
+  `晚上 app 会问你做了没` is not implemented.
+- No auto-dedup between step 1 unchecked rows and step 2
+  entries. User is responsible.
 
-## Surface contract (authoritative for this slice)
+## Surface contract v2 (authoritative)
 
-Render `/today` as follows, layering on top of the existing
-`TodayPage` shell.
+Render `/today` as follows, layering on top of the 355e704
+baseline.
 
 ### 0. Routing & project scoping
 
-- `/today` continues to accept `?project=<id>`. Project resolution
-  via `resolveActiveProject` is unchanged.
-- All four new server actions take `projectId` as an explicit
-  argument (never infer from cookie or session). The page passes
-  the resolved project id down via props.
+- `/today` continues to accept `?project=<id>`. Project
+  resolution via `resolveActiveProject` is unchanged.
+- Every server action takes `projectId` explicitly.
 
-### 1. `今日日志` compose card (new block)
+### 1. Page-head buttons
 
-- Placement: first child of the left `today-column`, above the
-  existing `昨日之承诺` block.
-- Card chrome: `card` class, top border `2px solid var(--amber)`,
-  12/16 padding — mirrors the knowledge-capture compose card.
-- Header row: `今日日志 · {ISO date}` left; right-aligned muted
-  status: `今日还未写` (bold ink) or `今日已写 · {HH:mm 提交时间}`
-  (muted).
-- **State A: today has no `DailyLog` row.** Form is expanded by
-  default:
-  - `今天做了什么` — chip editor, autofocus, placeholder
-    `+ 一项 ↵`.
-  - `今天没做什么` — chip editor, placeholder `+ 一项 ↵`.
-  - `用时` — number input, suffix `分钟`, placeholder `120`,
-    min=0, step=15.
-  - `明天第一件事` — single-line text input, placeholder
-    `一句话 · 明天开工就干这个`. Required, trimmed, 1–240 chars.
-  - `诚实笔记` — 3-row textarea, optional, placeholder
-    `{无则留空} · 今日有什么没讲出来的?`, max 2000 chars.
-  - Footer: muted `AI 不参与` (mirror the knowledge card's flipped
-    copy) + `[提交]` primary button. Keyboard `⌘↵` submits.
-- **State B: today already has a `DailyLog` row.** Form is
-  collapsed by default into a summary line:
-  `今日 · {minutes} 分 · {whatDone.length} 做 · {whatSkipped.length}
-  跳过` + a `[展开修改]` text button. Click re-expands the form
-  pre-filled with the existing row's values.
-- Submit: `upsertDailyLog({ projectId, date: today, ...fields })`.
-  On success, the card re-renders in State B (collapsed summary).
-  On Zod error, card stays expanded with field-level errors in
-  drift color.
+- Add a right-aligned button pair to the existing `.page-head`:
+  - `+ 记一条 N` — small, muted, **disabled**. Tooltip
+    `N 快捷键待定 · 先从 /knowledge 新建`.
+  - `今日收工 ⌘↵` — primary (amber-accented). Label flips to
+    `修改今日 ⌘↵` when today's `DailyLog` row already exists.
+    Clicking opens the wizard modal.
+- No keyboard-shortcut binding in v1 despite the `⌘↵` kbd glyph —
+  the glyph documents intent but the listener is parked (same
+  rationale as `N`). The button is clickable.
 
-### 2. `昨日之承诺 · 未结清` block (replaces empty-state)
+### 2. EndOfDay wizard modal
 
-- Heading stays `昨日之承诺 · 未结清`.
+- Implemented via client component `EndOfDayWizard.tsx`. Structure
+  per `EndOfDayWizard` in `docs/design/study-system/project/src/EndOfDay.jsx`,
+  with the adaptations in PM choices §6, §7, §8.
+- Modal header row: `收工 · 向导` (mono caps muted) +
+  `daily_log · d{day_index} · {ISO}` (serif).
+  - `day_index` is the 1-based day count within the project's
+    span — reuse `snap.day_index` computation from the existing
+    driving-seat builder in `web/lib/today/driving-seat.ts` if
+    already exposed; otherwise factor it out of
+    `buildDrivingSeatState` into a pure helper.
+- Step breadcrumb: 4-column grid, each column shows `{n}/4` +
+  step title. Active step has amber top rule; past step has ink
+  top rule + `done`-colored `✓`; future step has muted rule.
+  Clicking any past/future step heading jumps to that step
+  **without** validation gating (user can fill out of order).
+- Step 1 body:
+  - Subtitle per design:
+    `一条一个动作。『学了东西』不算。`
+  - Rendered inside a `card--ruled card` frame.
+  - For each entry in the step-1 list, render a row with a
+    `check` / `check--done` toggle and the entry's text. Text
+    strikes through when checked.
+  - Initial state constructor:
+    ```
+    todayPlannedTasks.map(text => ({ text, checked: false,
+      origin: "plan" }))
+    ```
+  - `+ 加一条(计划外的也写上)` row at the bottom: text input
+    that, on Enter or blur with non-empty trimmed value, appends
+    `{ text, checked: true, origin: "adhoc" }` and clears the
+    input.
+- Step 2 body:
+  - Subtitle per design:
+    `承认。说原因,不找借口。`  **No reason field** (per PM-Q2)
+    — design's copy is kept but the second column input is
+    **omitted**.
+  - Rows render as a single-column text input + a `[×]` remove
+    button per row.
+  - Initial state constructor: if
+    `yesterdayPromiseText !== null`, start with
+    `[{ text: yesterdayPromiseText }]`; otherwise `[]`.
+  - `+ 再加一条` button appends `{ text: "" }`.
+  - No `check--drift` icon prefix on rows (design showed it for
+    visual symmetry with the reason column; without reason it's
+    noise).
+  - Muted line at bottom: `昨日承诺会预填第一行 · 不想承认就删掉`.
+- Step 3 body:
+  - Label: `今日时长 · 分钟` (mono caps muted).
+  - Right-aligned large-font number input, `min=0`, no `max`
+    (Zod rejects negative). Default value: existing
+    `timeSpentMinutes` if editing, else empty.
+  - Preset chip row: 7 buttons
+    `30 / 60 / 90 / 120 / 150 / 180 / 240` each suffixed `m`.
+    Click sets the input value (replaces, does not add).
+  - **No** 7-day average line.
+- Step 4 body:
+  - First field label: `明日第一件事 · 具体动作` (mono caps).
+  - Single-line input, autofocus on step entry, required.
+  - Hint: `明早 /today 顶部会看到这句话`.
+  - Second field label: `诚实日记 · 写给明早的自己 · 可以留空`.
+  - 3-row textarea, optional.
+- Footer (all steps):
+  - Left: muted mono `不写自由文本『今天想说什么』 ·
+    结构化字段,就事论事`.
+  - Right:
+    - `[← back]` — disabled on step 1, else previous step.
+    - If step < 4: `[next →]` (primary). Keyboard: right-arrow
+      when focus is on the footer also advances; not required
+      if it complicates a11y.
+    - If step == 4: `[Commit log ⌘↵]` (primary). On click,
+      collect wizard state and call `upsertDailyLog`.
+- Submit:
+  - Client assembles `{ projectId, date: today, whatDone,
+    whatSkipped, timeSpentMinutes, tomorrowFirstThing,
+    honestyNote }` per PM §5.
+  - Calls the `"use server"` action. On `{ ok: true }`, close
+    modal and let `revalidatePath("/today")` refresh the page.
+  - On `{ ok: false, fieldErrors }`, jump to the step owning the
+    first error and render field-level error text in drift
+    color.
+
+### 3. `昨日之承诺 · 未结清` block (read-only)
+
+- Heading: `昨日之承诺 · 未结清` (same string the existing M3
+  code uses — adjust if needed).
 - Query: `DailyLog.findUnique({ projectId_date: { projectId,
-  date: yesterday } })` where `yesterday = today − 1 day`.
-- **Case A: no yesterday log OR `tomorrowFirstThing` is
-  empty-string after trim.** Render muted
-  `昨日未留下第一件事`. Nothing else in the block.
-- **Case B: yesterday log exists and has text.** Render two rows:
-  - Line 1: the `tomorrowFirstThing` string as plain serif text.
-  - Line 2 (right-aligned, small): `[记为未清账]` button (muted
-    outline; hover → ink border).
-- Clicking `[记为未清账]` calls the server action. On success the
-  block is revalidated and the button disappears once an
-  `OpenItem` with `source = "daily_log"` and matching
-  `text = yesterday.tomorrowFirstThing` exists for today (see
-  §3 below for de-dup rule).
+  date: yesterday } })`.
+- Case A — no yesterday log OR `tomorrowFirstThing` is empty
+  after trim: render muted `昨日未留下第一件事`.
+- Case B — yesterday log exists with text:
+  - Row shape per `TodayBlockPromises` in Today.jsx, simplified
+    for a single-source v1:
+    - Left: unchecked `check` icon (read-only — no click
+      handler; purely visual to match design).
+    - Middle: the `tomorrowFirstThing` in serif, in quotes:
+      `"{text}"`. Muted attribution line below:
+      `来自 昨日 daily_log · {yesterday ISO}`.
+    - Right: `未兑现` drift-colored mono label.
+- **No button. No server action called from this block.**
 
-### 3. `未清账` block (replaces empty-state)
+### 4. `未清账` block (keep from v1)
 
-- Heading stays `未清账`.
-- Query: `OpenItem.findMany({ where: { projectId, status: "open"
-  }, orderBy: { openedAt: "desc" } })`. Cap at 50; if the project
-  has more than 50 open items, render a muted footer
-  `仅显示 50 条 · 先关几条再加`.
-- Row rendering, top to bottom:
-  - Each open-item row: `text` (serif) left + small mono date
-    `MM-DD` (openedAt) + `[关闭]` button right (muted outline).
-  - Empty state: muted `无未清账` in place of rows.
-  - Always-present `+ 新增` row at the bottom:
-    - Text input (placeholder `+ 新增未清账 ↵`, max 500 chars).
-    - `[添加]` button right. Enter key also submits.
-- Close action: `closeOpenItem({ id })` writes
-  `status = "done"`. Row fades on re-render (muted sage).
-- Add action: `createOpenItem({ projectId, text, source: "manual"
-  })` — server fills `openedAt = startOfLocalDay(today)` and
-  `status = "open"`.
-- `记为未清账` de-dup: the server action in §2 checks whether an
-  `OpenItem` with matching `(projectId, text, source: "daily_log",
-  status: "open")` already exists; if yes, no-op and return
-  `{ ok: true, deduped: true }`. This keeps the button idempotent.
+- Unchanged from M1–M4 except for wording and placement:
+  - Query, cap, and close-action logic unchanged.
+  - Heading stays `未清账`.
+  - Read per-row day-overdue badge `+{Nd}` per Today.jsx
+    design — where `N = floor((today − openedAt) /
+    1 day)` for the open item. Ink-3 if `≤ 7`, drift
+    color if `> 7`. **This is new UX** on top of M1–M4's rows;
+    add a helper `daysOpen(openedAt, today): number`.
+  - `+ 新增` inline row unchanged.
+  - Remove the `[关闭]` button's de-dup hint path (was tied to
+    `记为未清账` — which is now gone).
 
-### 4. `阻塞` block (replaces empty-state)
+### 5. `阻塞` block (keep from v1)
 
-- Heading stays `阻塞`.
-- Query: `Blocker.findMany({ where: { projectId, resolvedAt: null
-  }, orderBy: { openedAt: "desc" } })`. Cap at 50, same footer
-  rule as §3.
-- Row rendering:
-  - Each active blocker row: `text` (serif) + small mono `MM-DD`
-    + `[解除]` button right.
-  - Empty state: muted `无阻塞`.
-  - `+ 新增` row identical to §3 (placeholder `+ 新增阻塞 ↵`).
-- Resolve action: `resolveBlocker({ id })` writes
-  `resolvedAt = new Date()`. Row disappears from the block on
-  next render (it falls out of the `resolvedAt IS NULL` filter).
-- Add action: `createBlocker({ projectId, text })` — server fills
-  `openedAt = startOfLocalDay(today)` and `resolvedAt = null`.
+- Unchanged from M1–M4:
+  - Query, cap, and resolve-action logic unchanged.
+  - Heading stays `阻塞`.
+  - Row shape: `text` + small mono `MM-DD` + `[解除]`.
+  - `+ 新增` inline row.
 
-### 5. Revalidation
+### 6. Revalidation
 
-- Every server action calls `revalidatePath("/today")` on success.
-- `upsertDailyLog` ALSO calls `revalidatePath("/today")` — the
-  `昨日之承诺` block on any future "tomorrow" depends on today's
-  `tomorrowFirstThing`.
-- No need to revalidate `/knowledge` from this slice.
+- Every mutating server action calls
+  `revalidatePath("/today")`. No other paths need
+  revalidation.
 
 ## Milestones
 
-### M1 — server-side data layer
+**M1–M4 landed at 355e704** (see Progress log at the bottom).
+They shipped the v1 inline-compose shape. M5–M8 below rework
+toward v2.
 
-- `web/lib/daily-log/queries.ts`
-  - `getTodayLog(projectId, today, prisma)` →
-    `DailyLog | null`.
-  - `getYesterdayPromise(projectId, today, prisma)` → `{ text:
-    string } | null`. Returns null if no yesterday row or empty
-    trim.
-  - `listOpenItems(projectId, prisma)` → up to 50 rows,
-    `status = "open"`, ordered by `openedAt` desc.
-  - `listActiveBlockers(projectId, prisma)` → up to 50 rows,
-    `resolvedAt IS NULL`, ordered by `openedAt` desc.
-  - `findCarriedForwardOpenItem(projectId, text, prisma)` →
-    `OpenItem | null` for the §3 de-dup check.
-- `web/lib/daily-log/actions.ts`
-  - `"use server"` module. Exports:
-    - `upsertDailyLog(formData)` — Zod-validates via
-      `dailyLogCreate`, then `prisma.dailyLog.upsert` on
-      `projectId_date`.
-    - `carryForwardYesterdayPromise({ projectId })` — reads
-      yesterday, guards for presence + non-empty, runs de-dup
-      check, creates `OpenItem` with `source = "daily_log"`.
-    - `createOpenItem({ projectId, text })` — source `"manual"`.
-    - `closeOpenItem({ id })` — writes `status = "done"`.
-    - `createBlocker({ projectId, text })`.
-    - `resolveBlocker({ id })` — writes `resolvedAt = new Date()`.
-  - Each action validates at the Zod boundary, calls
-    `revalidatePath("/today")`, and returns
-    `{ ok: true }` / `{ ok: false, fieldErrors }` /
-    `{ ok: true, deduped: true }` as applicable.
-- No new Zod schemas needed — `dailyLogCreate`, `openItemCreate`,
-  `blockerCreate` already exist. Extend inline if a partial
-  variant proves cleaner.
-- Commit per milestone as usual.
+### M5 — data layer reshape
 
-### M2 — UI primitives
+- **Delete** `carryForwardYesterdayPromise` from
+  `web/lib/daily-log/actions.ts`.
+- **Delete** `findCarriedForwardOpenItem` from
+  `web/lib/daily-log/queries.ts`.
+- **Keep** `upsertDailyLog`, `createOpenItem`, `closeOpenItem`,
+  `createBlocker`, `resolveBlocker`, `listOpenItems`,
+  `listActiveBlockers`, `getTodayLog`.
+- **Rename / reshape** `getYesterdayPromise` → keep the same
+  name and return shape `{ text: string } | null` (already
+  correct for read-only consumption). If the existing impl
+  returns a larger shape, trim to just `{ text }`.
+- **Add** `getTodayPlannedTasks(projectId, today, prisma)` →
+  `string[]`. Reads `PlanDay.findUnique({ projectId_date })`
+  and extracts the `plannedTasks` JSON array safely (filter to
+  `string`, ignore others). Return `[]` if no row.
+- **Add** helper `daysOpen(openedAt: Date, today: Date): number`
+  in `web/lib/daily-log/presentation.ts` (M1–M4 already created
+  `presentation.ts`; extend). Use `startOfLocalDay` for both
+  bounds. In-source tests guarded by `if (import.meta.vitest)`.
+- Commit: `daily-log-flow M5: data-layer reshape for wizard`.
 
-- `web/components/daily-log/DailyLogCompose.tsx` — client
-  component. Holds the five-field state, submits to
-  `upsertDailyLog`. Takes `initialValues: DailyLog | null`,
-  `projectId`, `today: Date` as props.
-- `web/components/daily-log/DailyLogSummary.tsx` — server
-  component (or inline in the parent); renders the collapsed
-  summary line. Clicking `[展开修改]` toggles the client wrapper.
-- `web/components/daily-log/YesterdayPromiseBlock.tsx` — server
-  component. Reads the query result; if present, renders the
-  string + a small `CarryForwardButton.tsx` client child that
-  calls `carryForwardYesterdayPromise`.
-- `web/components/daily-log/OpenItemsBlock.tsx` — server; renders
-  rows + the inline add row. `CloseOpenItemButton.tsx` and
-  `AddOpenItemRow.tsx` are the client children.
-- `web/components/daily-log/BlockersBlock.tsx` — server; same
-  shape as `OpenItemsBlock` for `Blocker`.
-- `web/components/daily-log/ChipEditor.tsx` — client component
-  shared by `whatDone` / `whatSkipped`. Internal state array of
-  strings; exposes `name` and `values` as controlled from the
-  parent compose form.
-- Decision: do not factor `AddOpenItemRow` and the blocker add
-  row into one component for v1; their server actions differ and
-  the two files are short. Revisit if dogfood shows duplication
-  pain.
+### M6 — UI rework
 
-### M3 — page assembly
+- **Delete** the M1–M4 inline-compose surface:
+  - `web/components/daily-log/DailyLogCompose.tsx`
+  - `web/components/daily-log/DailyLogSummary.tsx` (or whatever
+    M1–M4 named it)
+  - `web/components/daily-log/CarryForwardButton.tsx` (the
+    `[记为未清账]` client child)
+  - Chip editor component — **keep only if reused by the new
+    step 2**; simpler to write a purpose-built step-2 list
+    component and delete the chip editor.
+- **Reshape** `YesterdayPromiseBlock.tsx`:
+  - Remove the button child.
+  - Add the muted `未兑现` label and the quoted-text + attribution
+    layout per Surface §3.
+- **Reshape** `OpenItemsBlock.tsx`:
+  - Add the `+{Nd}` days-overdue badge per row per Surface §4.
+  - Keep everything else.
+- **Keep** `BlockersBlock.tsx`, `AddOpenItemRow`,
+  `CloseOpenItemButton`, `AddBlockerRow`, `ResolveBlockerButton`
+  as-is.
+- **Add** the wizard:
+  - `web/components/daily-log/EndOfDayEntry.tsx` — client
+    wrapper: renders the `今日收工` button and the inert
+    `+ 记一条` button; manages wizard open state; renders
+    `<EndOfDayWizard>` when open.
+  - `web/components/daily-log/EndOfDayWizard.tsx` — client
+    component: scrim + modal shell, step breadcrumb, footer
+    buttons, step-switch. Owns the full wizard form state.
+  - `web/components/daily-log/wizard/Step1Checklist.tsx`
+  - `web/components/daily-log/wizard/Step2SkippedList.tsx`
+  - `web/components/daily-log/wizard/Step3TimeInput.tsx`
+  - `web/components/daily-log/wizard/Step4TomorrowNote.tsx`
+  - Each step component is a client component with pure
+    prop-driven rendering and change handlers. No Prisma, no
+    fetch.
+- Commit: `daily-log-flow M6: EndOfDay wizard + read-only promise`.
+
+### M7 — page rework
 
 - Update `web/app/today/page.tsx`:
-  - Add parallel queries to the existing `Promise.all`:
-    `getTodayLog`, `getYesterdayPromise`, `listOpenItems`,
-    `listActiveBlockers`.
-  - Render the new `DailyLogCompose` / `DailyLogSummary` at the
-    top of the left column.
-  - Replace the `昨日之承诺` empty-state with
-    `<YesterdayPromiseBlock>`.
-  - Replace the `未清账` empty-state with `<OpenItemsBlock>`.
-  - Replace the `阻塞` empty-state with `<BlockersBlock>`.
-- No change to the fact-strip, the driving-seat sentence, the
-  timeline, or the `最近动静` block.
+  - **Remove** the inline compose card render from the left
+    column.
+  - **Add** the new button pair to the `page-head` right side
+    via `<EndOfDayEntry>` (client).
+  - Pass props to `<EndOfDayEntry>`:
+    - `projectId`
+    - `today` (Date)
+    - `existingLog: DailyLog | null` — result of `getTodayLog`
+    - `todayPlannedTasks: string[]` — result of
+      `getTodayPlannedTasks`
+    - `yesterdayPromiseText: string | null` — result of
+      `getYesterdayPromise` (unwrapped to the string or null).
+  - Left column new shape: `<YesterdayPromiseBlock>`, then the
+    existing `<Block heading={todayLabel}>` block (unchanged).
+  - Middle column: `<RecentKnowledgeList>` (unchanged).
+  - Right column: `<OpenItemsBlock>` + `<BlockersBlock>` (both
+    unchanged from M6 reshape).
+  - Keep the `Promise.all` parallel fetches; add
+    `getTodayPlannedTasks` to the list.
+- Commit: `daily-log-flow M7: wire wizard into /today`.
 
-### M4 — tests
+### M8 — test reshape
 
-- In-source unit tests (guarded by `if (import.meta.vitest)`):
-  - Any small pure helpers added (e.g. collapsed-summary
-    formatter, yesterday-date computation if factored out).
-- Temp-DB integration tests (mirror
-  `web/tests/knowledge-create.test.ts`):
-  - `web/tests/daily-log-upsert.test.ts`
-    - Seeds a `Project`, calls `upsertDailyLog` with full fields,
-      asserts row exists.
-    - Calls `upsertDailyLog` again for the same `(projectId,
-      date)`, asserts update (not duplicate row).
-    - Rejects malformed input (negative minutes,
-      empty `tomorrowFirstThing`).
-  - `web/tests/daily-log-carry-forward.test.ts`
-    - Seeds a yesterday `DailyLog` with a non-empty
-      `tomorrowFirstThing`, calls
-      `carryForwardYesterdayPromise`, asserts one new
-      `OpenItem` row with `source = "daily_log"` and the
-      expected `text`.
-    - Calls the action a second time, asserts no duplicate row
-      (`deduped: true`).
-    - Seeds a yesterday log with empty `tomorrowFirstThing`,
-      asserts the action is a no-op (or returns an ok-no-row
-      shape — lock the shape in the test).
-  - `web/tests/open-items-actions.test.ts`
-    - `createOpenItem` writes the right fields; `closeOpenItem`
-      sets `status = "done"`; `listOpenItems` no longer returns
-      the closed row.
-  - `web/tests/blockers-actions.test.ts`
-    - `createBlocker` writes the right fields; `resolveBlocker`
-      sets `resolvedAt` to a non-null date;
-      `listActiveBlockers` no longer returns the resolved row.
-- Integration render test:
-  - Extend `web/tests/today-page.test.tsx` (already exists):
-    - Seed a `DailyLog` for today → `今日日志` card renders in
-      collapsed summary state.
-    - Seed a `DailyLog` for yesterday with
-      `tomorrowFirstThing = "X"` → `昨日之承诺` renders "X" +
-      the `[记为未清账]` button.
-    - Seed two `OpenItem(status="open")` rows → `未清账` block
-      renders both.
-    - Seed one `Blocker(resolvedAt=null)` → `阻塞` block renders
-      it.
-    - Do NOT assert the submit flow through RTL — the direct
-      server-action tests above cover correctness.
+- **Delete** `web/tests/daily-log-carry-forward.test.ts`.
+- **Keep** `web/tests/daily-log-upsert.test.ts`. Add one test
+  case covering the wizard-shape input assembled in the client
+  (the action still receives a `DailyLogCreateInput` — the test
+  just builds that payload with realistic step-1-derived
+  `whatDone` + `whatSkipped`).
+- **Keep** `web/tests/open-items-actions.test.ts` and
+  `web/tests/blockers-actions.test.ts`. No change.
+- **Update** `web/tests/today-page.test.tsx`:
+  - Remove assertions that require the inline compose card or
+    the `[记为未清账]` button.
+  - Add an assertion that the `今日收工` button renders on the
+    page-head.
+  - Add an assertion that when yesterday's log with
+    `tomorrowFirstThing = "X"` exists, the `昨日之承诺` block
+    renders the quoted text and a `未兑现` label, and does NOT
+    render any button.
+  - Keep the open-item / blocker rendering assertions (they
+    stay valid through the reshape).
+  - Do NOT attempt to drive the wizard through RTL. Wizard
+    behavior is covered by the direct server-action tests in
+    `daily-log-upsert.test.ts`.
+- **Add** in-source test cases for `daysOpen(openedAt, today)`
+  in `web/lib/daily-log/presentation.ts` — zero-day, one-day,
+  multi-day, timezone-boundary safety.
+- Commit: `daily-log-flow M8: test reshape for wizard`.
 
-### M5 — doc sync
+### M9 — doc sync
 
 - `docs/STATE.md`:
-  - current phase flips to "`daily-log-flow`
-    implementation-complete; fresh-context review pending"
-  - `What Is True Now / Repository contents` gains
-    `web/lib/daily-log/`, `web/components/daily-log/`, the four
-    new test files
-  - `Verification Snapshot` gets the new test count
-  - `Recommended Next Step` points to the review session
-- No PRD change.
-- No decision-record change.
+  - current phase flips to "`daily-log-flow` v2 implementation
+    complete; fresh-context review pending".
+  - `What Is True Now / Repository contents` updated: mention
+    the wizard components, remove any reference to the
+    deleted inline-compose files.
+  - `Verification Snapshot` updated with the new test count.
+  - `Recommended Next Step` points to the review session.
+- No PRD change. No decision-record change.
+- Commit: `daily-log-flow M9: doc sync`.
 
 ## Verification
 
-All must pass before close-out.
+All must pass before review hand-off.
 
 - `cd web && npm run typecheck` — green
 - `cd web && npm run lint` — green
-- `cd web && npm test` — green, new tests included
+- `cd web && npm test` — green; test count should be **106** or
+  lower than 107 (M8 deletes the carry-forward file; exact
+  count depends on how many cases that file held — Codex reports
+  the delta).
 - `cd web && npm run build` — green; `/today` stays `ƒ`
-  (dynamic), other routes unchanged
+  (dynamic), other routes unchanged.
 - Manual on `npm run dev` (preview against a seeded project):
-  1. Fresh day (no today log): `/today` shows the compose card
-     expanded. Submit a log; card collapses to summary; refresh
-     the page — summary persists.
-  2. Expand the summary via `[展开修改]`, change `用时`, submit
-     again — same row is updated, not duplicated.
+  1. Fresh day (no today log): `/today` shows `今日收工` as
+     primary. Click it → wizard opens on step 1 with
+     `PlanDay.plannedTasks` as unchecked rows. Check two, add
+     one off-plan row, advance to step 4, submit. `/today`
+     refreshes; `今日收工` label flips to `修改今日`.
+  2. Click `修改今日` → wizard opens with today's log
+     pre-filled. Change the time, submit — same row updated.
   3. Backdate a `DailyLog` to yesterday with
      `tomorrowFirstThing = "写完 retro plan"`; reload `/today`
-     → `昨日之承诺` renders that string + `[记为未清账]`; click
-     the button → a row appears in `未清账` with that text;
-     click again → no duplicate.
-  4. `+ 新增` a未清账 and a阻塞; close one and resolve one;
-     verify they disappear from their blocks.
-  5. Switch projects via the sidebar — every block should
-     re-render scoped to the new project (no bleed).
+     → `昨日之承诺` renders the quoted text + `未兑现` label,
+     no button. Open 收工 → step 2 starts with one pre-filled
+     row matching that text.
+  4. `+ 新增` a 未清账 item dated 10 days ago (direct DB or
+     older-openedAt seed); verify the `+10d` badge renders in
+     drift color.
+  5. `+ 新增` a 阻塞; `[解除]` it; it disappears.
+  6. Switch projects via the sidebar — every block rerenders
+     scoped to the new project. No bleed.
 
-## Open questions
+## Open questions / parked
 
-_All PM-level open questions were resolved 2026-04-21 before
-handoff; see PM-confirmed choices above. Parked items below are
-intentionally deferred to later slices._
+_All v2 PM-level questions were resolved 2026-04-22 before
+handoff; see PM-confirmed choices v2 above. Parked items below
+are intentionally deferred to later slices._
 
-### Parked for later slices (not required for this slice to land)
+### Parked for later slices
 
-- **Past-day view.** If dogfood shows a real need to see or edit
-  prior-day `daily_log` rows from the UI, open a follow-up slice
-  after `retro-flow`. The durable records exist in the DB.
-- **`Bookmark` driving-seat surface.** Schema present, UI absent.
-  Roll into a Today-polish slice post-dogfood.
-- **`OpenItem.status = "dropped"` flow.** Only `"open" → "done"`
-  is wired in v1. A `[放弃]` variant waits on dogfood demand.
-- **Blocker severity / grouping.** Schema has no severity
-  column; adding one is a schema change and a later decision.
-- **`累计 commits` / `连续写 log` fact-strip reads.** These live
-  in the fact-strip, not in the ledger blocks this slice touches.
-  Roll into a post-dogfood Today-polish slice.
+- **Inline checkbox on `今日 · {ISO}` block** (mid-day progress
+  tracking). Design shows it; v1 keeps that block read-only,
+  only the wizard has checkboxes. Revisit if dogfood shows
+  value.
+- **7-day time average / median** in wizard step 3. Needs an
+  analytics read layer v1 doesn't have.
 - **Global `N = 新建` shortcut.** Still parked from
   `knowledge-capture-inline`.
+- **Wizard draft persistence.** Modal state is lost on close.
+  Revisit if dogfood shows pain.
+- **Past-day view** of daily_log rows from the UI.
+- **`Bookmark` driving-seat surface.** Schema present, UI
+  absent.
+- **`OpenItem.status = "dropped"` UI.**
+- **Blocker severity / grouping.** Needs schema change.
+- **`累计 commits` / `连续写 log` fact-strip reads.** A later
+  Today-polish slice.
+- **Wizard submit notification scaffolding** (`晚上 app
+  会问你做了没` hint in the design).
 
 ## Progress log
 
@@ -513,3 +653,9 @@ short: milestone id, commit sha, one-line outcome._
 - M2 @ f281e0e: Added compose and block UI primitives.
 - M3 @ 43798b8: Wired daily-log surfaces into /today.
 - M4 @ b6b6be8: Added daily-log action and page tests.
+- _(v1 shape complete at head 355e704; v2 rework starts below)_
+- M5 @ 1050b8b: Reshaped queries/actions for the wizard and added `daysOpen`.
+- M6 @ b515e97: Replaced inline compose with the EndOfDay wizard and read-only promise UI.
+- M7 @ 2ce6f6c: Wired the wizard, read-only promise block, and planned-task fetch into `/today`.
+- M8 @ 72f3b4d: Reshaped tests, removed carry-forward coverage, and fixed step-2 promise prefill found during smoke.
+- M9 @ see final handoff: Synced repo state docs; the commit's own sha is reported in handoff to avoid a self-referential amend.
