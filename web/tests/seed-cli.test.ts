@@ -36,6 +36,66 @@ afterEach(async () => {
 });
 
 describe("seed CLI", () => {
+  it("enforces project name uniqueness at the database layer", async () => {
+    await prisma.project.create({
+      data: {
+        name: "Duplicate Project",
+        startDate: new Date("2026-05-03"),
+        endDate: new Date("2026-05-07"),
+        hasPlanStructure: "full",
+        status: "active",
+      },
+    });
+
+    await expect(
+      prisma.project.create({
+        data: {
+          name: "Duplicate Project",
+          startDate: new Date("2026-05-10"),
+          endDate: new Date("2026-05-14"),
+          hasPlanStructure: "full",
+          status: "draft",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+  });
+
+  it("enforces segment order uniqueness within a project at the database layer", async () => {
+    const project = await prisma.project.create({
+      data: {
+        name: "Segment Constraint Project",
+        startDate: new Date("2026-05-03"),
+        endDate: new Date("2026-05-07"),
+        hasPlanStructure: "full",
+        status: "active",
+      },
+    });
+
+    await prisma.planSegment.create({
+      data: {
+        projectId: project.id,
+        order: 1,
+        name: "Phase 1",
+        startDate: new Date("2026-05-03"),
+        endDate: new Date("2026-05-04"),
+        goals: ["first"],
+      },
+    });
+
+    await expect(
+      prisma.planSegment.create({
+        data: {
+          projectId: project.id,
+          order: 1,
+          name: "Phase 1 duplicate",
+          startDate: new Date("2026-05-05"),
+          endDate: new Date("2026-05-06"),
+          goals: ["second"],
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+  });
+
   it("seeds the smoke fixture, reruns idempotently, and preserves user tables", async () => {
     const dryRun = runSeed([fixturePath, "--dry-run"]);
     expectSuccess(dryRun);

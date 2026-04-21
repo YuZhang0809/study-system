@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { Prisma } from "@prisma/client";
 import { applySeedPlan } from "../lib/seed/writer";
 import { createSeedPrismaClient } from "../lib/seed/prisma";
 import { readSeedSnapshot } from "../lib/seed/reader";
@@ -110,6 +111,11 @@ function normalizeError(error: unknown): SeedError {
     return error;
   }
 
+  const prismaSeedError = normalizePrismaError(error);
+  if (prismaSeedError) {
+    return prismaSeedError;
+  }
+
   if (error instanceof Error) {
     return new SeedError(
       3,
@@ -125,6 +131,44 @@ function normalizeError(error: unknown): SeedError {
     process.env.SEED_DEBUG === "1" ? [error instanceof Error ? error.message : String(error)] : [],
     error,
   );
+}
+
+function normalizePrismaError(error: unknown): SeedError | null {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return null;
+  }
+
+  return new SeedError(
+    4,
+    "database uniqueness conflict while writing seed plan",
+    formatUniqueConstraintDetails(error.meta?.target),
+    error,
+  );
+}
+
+function formatUniqueConstraintDetails(target: unknown): string[] {
+  if (Array.isArray(target) && target.every((value) => typeof value === "string")) {
+    const fields = [...target].sort();
+    if (fields.length === 1 && fields[0] === "name") {
+      return ["project.name must remain unique"];
+    }
+
+    if (fields.length === 2 && fields[0] === "order" && fields[1] === "projectId") {
+      return ["plan_segment(projectId, order) must remain unique"];
+    }
+
+    if (fields.length === 2 && fields[0] === "date" && fields[1] === "projectId") {
+      return ["plan_day(projectId, date) must remain unique"];
+    }
+
+    return [`unique constraint target: ${fields.join(", ")}`];
+  }
+
+  if (typeof target === "string" && target.length > 0) {
+    return [`unique constraint target: ${target}`];
+  }
+
+  return ["the database rejected a duplicate natural key"];
 }
 
 async function main(): Promise<SeedExitCode> {

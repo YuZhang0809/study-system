@@ -466,7 +466,46 @@ All must pass before close-out.
   `chore: baseline — scaffold-and-schema slice closed + M5–M8 fixes`
   on `main`, then proceed with M1. Per-milestone commits for
   seed-cli start from M1 as originally planned.
+- 2026-04-21 — **PM decision on the parked natural-keys risk:** pull
+  the fix back into this slice rather than deferring. Reason: the
+  CLI's correctness already depends on `Project.name` and
+  `PlanSegment(projectId, order)` being unique; leaving that
+  unenforced at the schema level is a silent-drift hazard that gets
+  harder to migrate once real user data lands. The fix window is
+  cheap now (dev.db has 9 rows of fixture data). Scope: add
+  `@@unique([name])` on `Project` and `@@unique([projectId, order])`
+  on `PlanSegment`, generate a single additive migration, regenerate
+  the Prisma client, rerun the full verification sweep
+  (`typecheck` / `lint` / `test` / `build`) and the manual smoke.
+  The slice remains `open` until the human PM runs the
+  fresh-context review session on the full set of commits
+  (including this follow-up); only then does it archive. Codex
+  handoff for this follow-up delivered inline in chat on 2026-04-21.
+- 2026-04-21 — Natural-key follow-up landed inside the open slice:
+  added `@@unique([name])` on `Project` and
+  `@@unique([projectId, order])` on `PlanSegment`, generated
+  `web/prisma/migrations/20260421184126_natural-keys-unique/migration.sql`,
+  regenerated Prisma Client, kept the reader/resolver/writer runtime
+  conflict checks as defense-in-depth, and taught the CLI entrypoint
+  to translate Prisma `P2002` unique-violation errors into the
+  existing structured `seed failed (...)` stderr shape instead of
+  leaking a raw stack trace. Because `prisma migrate dev --name
+  natural-keys-unique` refused on `dev.db` drift, the migration used
+  the approved fallback path: `prisma migrate diff --from-migrations
+  prisma/migrations --to-schema prisma/schema.prisma --script
+  --output prisma/migrations/20260421184126_natural-keys-unique/migration.sql`,
+  then `prisma db execute --file` replayed that SQL against
+  `web/prisma/dev.db`. Verification rerun green:
+  `npm run typecheck`, `npm run lint`, `npm test`, and
+  `npm run build`; manual smoke steps 1–9 reran on `web/prisma/dev.db`
+  and passed, including step 8 (second project, different name) and
+  step 9 (same name, different `start_date`, treated as UPDATE).
 
 ## Change Log
 
-_(Empty at open. Append entries as scope shifts.)_
+- 2026-04-21 — Scope expanded within the open slice to include a
+  Prisma schema-level natural-key enforcement pass, driving one
+  additional migration. The original "no Prisma schema changes"
+  invariant under Constraints is therefore narrowed to: "no schema
+  changes outside the specific natural-key unique constraints
+  listed in the Progress Log dated 2026-04-21."

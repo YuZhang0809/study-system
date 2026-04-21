@@ -31,6 +31,8 @@ model Project {
   openItems      OpenItem[]
   blockers       Blocker[]
   bookmarks      Bookmark[]
+
+  @@unique([name])
 }
 
 model PlanSegment {
@@ -49,6 +51,7 @@ model PlanSegment {
   retro   Retro?
 
   @@index([projectId])
+  @@unique([projectId, order])
 }
 
 model PlanDay {
