@@ -764,6 +764,25 @@ button {
   gap: 8px;
 }
 
+.knowledge-page-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.knowledge-page-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.knowledge-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
 .knowledge-pillbar {
   flex: 1;
   margin-bottom: 0;
@@ -941,6 +960,11 @@ button {
 @media (max-width: 900px) {
   .knowledge-new-row {
     justify-content: flex-start;
+  }
+
+  .knowledge-filter-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .knowledge-compose-grid {
