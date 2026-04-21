@@ -11,6 +11,7 @@ npm install
 cp .env.example .env
 npm run prisma:generate
 npm run prisma:migrate    # applies web/prisma/migrations to prisma/dev.db
+npm run seed -- tests/fixtures/seed-smoke.yaml --dry-run
 npm run dev               # http://localhost:3000
 ```
 
@@ -18,6 +19,8 @@ npm run dev               # http://localhost:3000
 
 - `dev` / `build` / `start` — Next.js
 - `lint` / `typecheck` — eslint + `tsc --noEmit`
+- `seed -- <path> [--dry-run]` — idempotent plan import with loud
+  update/orphan reporting
 - `test` / `test:watch` — vitest (schema round-trip + Zod units)
 - `prisma:migrate` / `prisma:generate` / `prisma:studio` — Prisma
 

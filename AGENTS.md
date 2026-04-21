@@ -89,17 +89,14 @@ is no root `package.json`.
 - `cd web && npm run dev` — Next.js dev server on port 3000
 - `cd web && npm run lint`
 - `cd web && npm run typecheck` — `tsc --noEmit`
+- `cd web && npm run seed -- <path/to/plan.yaml> [--dry-run]` —
+  idempotent plan import into `Project` / `PlanSegment` / `PlanDay`
 - `cd web && npm test` — vitest run (schema round-trip + Zod units)
 - `cd web && npm run test:watch` — vitest watch mode
 - `cd web && npm run build`
 - `cd web && npm run prisma:migrate` — alias for `prisma migrate dev`
 - `cd web && npm run prisma:generate` — regenerate Prisma Client
 - `cd web && npm run prisma:studio` — open Prisma Studio
-
-Not yet landed (later slices):
-
-- `npm run seed -- <path/to/plan.yaml>` — idempotent plan import,
-  owned by the `seed-cli` slice.
 
 If a command does not yet exist, say so explicitly rather than
 inventing a replacement.

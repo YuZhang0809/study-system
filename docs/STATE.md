@@ -4,31 +4,29 @@ Last updated: 2026-04-21
 
 ## Current Phase
 
-**Scaffold landed; `seed-cli` slice open.** The `scaffold-and-schema`
-slice closed out M1–M9 on 2026-04-21. Post-close review (M5–M8
-findings from Codex) landed the same day: `DATABASE_URL` moved to
-`file:./prisma/dev.db`, `PlanDay(projectId, date)` became a unique
-constraint via a new migration, `dotenv` was added as an explicit
-`web/` dev dep, and STATE / plan / README drift was cleaned up.
+**Scaffold and `seed-cli` landed; next slice is `today-page-skeleton`.**
+The `scaffold-and-schema` slice is closed, and the follow-on
+`seed-cli` slice has now landed on top of it. The repository now has
+an idempotent plan-import CLI at `web/scripts/seed.ts` with a locked
+developer-facing entrypoint:
+`cd web && npm run seed -- <path> [--dry-run]`.
 
 The repository now holds a runnable Next.js app at `web/`, the full
 PRD §3 data model in a Prisma schema, a migrated SQLite dev DB, a
-Zod schema layer at the validation boundary, and a vitest harness
-with one round-trip smoke test plus per-entity unit tests.
+Zod schema layer at the validation boundary, a seed parser/resolver /
+writer stack for `Project` / `PlanSegment` / `PlanDay`, and a vitest
+harness covering schema round-trip, in-source validation, resolver
+logic, and seed CLI integration.
 
 No user-visible feature has landed yet. The six surfaces
 (`/today`, `/plan`, `/knowledge`, `/retros`, `/artifacts`,
 `/settings`) render the empty shell and a placeholder pane.
 
-The [`seed-cli`](./plans/seed-cli.md) slice is now open (PM layer)
-with the idempotency contract fully locked: yaml wins on all
-plan-structure columns, but every update is **loud** — the CLI
-reports the blast radius (daily_logs / retros tied to the row being
-changed) before writing. Orphans (rows present in DB but absent
-from yaml) are preserved and logged, never deleted. This aligns
-the CLI with PRD §0 ("让你不能对自己的学习状态自欺"): seed can
-align structure, but cannot silently erase evidence of drift. Ready
-for Codex handoff.
+`seed-cli` is no longer the recommended next step; it is part of the
+current repo truth. Its contract is now implemented: yaml wins on
+plan-structure columns, every update is loud, blast radius is
+reported for changed segments/days, and orphans are preserved and
+logged instead of deleted.
 
 **Dogfood deadline remains 2026-05-03.** 12-day window has shrunk
 to roughly 11 days (2026-04-22 → 2026-05-02).
@@ -52,6 +50,8 @@ to roughly 11 days (2026-04-22 → 2026-05-02).
 - `web/README.md` — app-local quick start, script, and layout notes
 - `web/prisma.config.ts` — Prisma 7 datasource + migrations config
 - `web/lib/schemas/` — Zod schemas (11 entity files + enums + index)
+- `web/lib/seed/` — seed parser, resolver, DB reader/writer, and
+  shared Prisma factory
 - `web/lib/surfaces.ts` — six-surface map (single source of truth
   for labels, paths, shortcuts)
 - `web/components/shell/` — Sidebar, Header, Footer, KeyboardNav,
@@ -59,6 +59,11 @@ to roughly 11 days (2026-04-22 → 2026-05-02).
 - `web/tests/schema-roundtrip.test.ts` — boots a temp DB, inserts
   one row per entity, verifies round-trip + polymorphic Artifact
   lookup
+- `web/tests/seed-cli.test.ts` — temp-DB integration coverage for
+  first seed, idempotent re-seed, drift visibility, and orphan
+  preservation
+- `web/tests/fixtures/seed-smoke.yaml` — 3-segment / 5-day smoke
+  fixture used by the integration test and manual verification
 
 ### Runtime shape
 
@@ -71,15 +76,18 @@ to roughly 11 days (2026-04-22 → 2026-05-02).
   requires an adapter for SQLite at runtime; `better-sqlite3` is
   the native driver)
 - Zod 4.3.6 for boundary validation
-- Vitest 4.1.4 with `includeSource` so each schema carries its own
-  `if (import.meta.vitest)` describe block
+- `tsx` 4.21.0 for the seed CLI runner
+- `yaml` 2.8.3 for plan import parsing
+- Vitest 4.1.4 with `includeSource` so each schema / seed module can
+  carry its own `if (import.meta.vitest)` describe block
 - Apple system font stack hardcoded; no Google Fonts; italics
   disabled at the base CSS layer
 
 ### Current commands (run from `web/`)
 
-See `AGENTS.md` for the full list. Typecheck, lint, test, build
-all green as of 2026-04-21.
+See `AGENTS.md` for the full list. The seed CLI is now part of that
+baseline command set, and the full verification sweep below was rerun
+after it landed.
 
 ### Locked-in product constraints
 
@@ -90,13 +98,20 @@ CLI must be idempotent, UI in Simplified Chinese.
 
 ## Verification Snapshot
 
-As of 2026-04-21 end-of-slice:
+As of 2026-04-21 after `seed-cli`:
 
 - `cd web && npm run typecheck` — green
 - `cd web && npm run lint` — green
-- `cd web && npm test` — 13 test files, 25 tests, all green
+- `cd web && npm test` — 16 test files, 46 tests, all green
 - `cd web && npm run build` — green (all 8 routes prerendered
   static)
+- `cd web && npm run seed -- tests/fixtures/seed-smoke.yaml --dry-run`
+  — green; prints 1 project insert, 3 segment inserts, 5 day inserts,
+  no orphans
+- Manual smoke steps 3–9 from
+  [`docs/plans/seed-cli.md`](./plans/seed-cli.md) all executed against
+  `web/prisma/dev.db`, including loud blast-radius output for segment /
+  day updates and orphan preservation with an existing `DailyLog`
 - `/today` through `/settings` render correctly; keyboard shortcuts
   `1`–`5` and `,` route correctly; paper-ruling overlay visible
 
@@ -123,16 +138,15 @@ Unchanged from prior STATE.md except where noted:
 
 ## Recommended Next Step
 
-**Hand [`seed-cli`](./plans/seed-cli.md) to Codex.** Plan is
-fully locked: yaml shape, natural keys, idempotency contract
-(yaml-wins + loud blast-radius reporting), orphan preservation
-rule, six milestones (M1 entrypoint → M2 yaml schema → M3 resolver
-+ reader + writer → M4 dry-run + blast-radius output → M5 tests
-including drift-visibility cases → M6 doc sync). Codex handoff
-prompt pasted into chat on 2026-04-21.
+**Open `today-page-skeleton`.** `seed-cli` now exists and unblocks
+the feature pipeline: projects can be imported into the local DB,
+and later surfaces no longer need to invent a project-creation path.
+The next slice should consume real seeded `Project` / `PlanSegment` /
+`PlanDay` rows to replace the Today placeholder pane with a
+structure-aware skeleton.
 
-After `seed-cli`, the intended slice order is
-`today-page-skeleton` → `knowledge-capture-inline` →
+After `today-page-skeleton`, the intended slice order is
+`knowledge-capture-inline` →
 `daily-log-flow` → `weekly-review-flow` → `retro-flow` →
 `export-json-cli` (PRD §10 requires export before dogfood-trust).
 
@@ -153,7 +167,6 @@ Explicitly deferred to v2 per PRD §5:
 
 Deferred inside v1 but planned:
 
-- `seed-cli` (next slice)
 - `export-json-cli` (required before dogfood-trust)
 - The five feature surface slices (Today / knowledge /
   daily-log / weekly / retro)

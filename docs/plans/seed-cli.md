@@ -435,6 +435,11 @@ All must pass before close-out.
   idempotent re-seed, loud updates, segment/day blast-radius output,
   orphan preservation, and the guarantee that user tables never gain
   or lose rows across seed runs.
+- 2026-04-21 — M6 landed: synced `AGENTS.md`, `web/README.md`, and
+  `docs/STATE.md`, then reran `typecheck`, `lint`, `test`, and
+  `build` green. Manual smoke steps 1–9 also ran against `dev.db`,
+  including the loud segment/day blast-radius cases and preserved
+  orphan verification with an existing `DailyLog`.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its
