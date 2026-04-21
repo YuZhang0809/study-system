@@ -137,6 +137,37 @@ describe("/today page", () => {
     expect(screen.queryByText("Inspect schema")).toBeNull();
   });
 
+  it("renders recent knowledge rows instead of the empty state when captures exist", async () => {
+    const project = await seedProject({
+      name: "Knowledge Feed Project",
+      startDate: "2026-05-03",
+      endDate: "2026-05-05",
+      segmentName: "Phase 1 - Foundations",
+    });
+
+    await prisma.knowledgeItem.create({
+      data: {
+        projectId: project.id,
+        type: "bug",
+        title: "Parser trims the trailing slash",
+        slug: "parser-trims-the-trailing-slash",
+        bodyMd: "现象 · 请求被错误归一化",
+        tags: ["parser"],
+        metadata: {},
+        createdAt: new Date("2026-05-05T01:30:00.000Z"),
+        updatedAt: new Date("2026-05-05T01:30:00.000Z"),
+      },
+    });
+
+    await renderTodayRoute({ project: project.id });
+
+    const recentBlock = getBlockByHeading("最近动静");
+    expect(within(recentBlock).queryByText("尚未记录 · 用 /knowledge 新建第一条")).toBeNull();
+    expect(within(recentBlock).getByText("BUG")).toBeTruthy();
+    expect(within(recentBlock).getByText("Parser trims the trailing slash")).toBeTruthy();
+    expect(within(recentBlock).getByText("今日")).toBeTruthy();
+  });
+
   it("renders the no-project empty state when the database is empty", async () => {
     await renderTodayRoute();
 
@@ -221,6 +252,17 @@ function getProjectLinks() {
     const href = link.getAttribute("href");
     return href?.startsWith("/today?project=");
   });
+}
+
+function getBlockByHeading(heading: string) {
+  const label = screen.getByText(heading);
+  const section = label.closest("section");
+
+  if (!section) {
+    throw new Error(`expected block for ${heading}`);
+  }
+
+  return section;
 }
 
 async function seedProject({
