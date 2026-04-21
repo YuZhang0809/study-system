@@ -41,8 +41,17 @@ const rawPlanYamlSchema = z
   })
   .superRefine((value, ctx) => {
     const segmentOrders = new Map<number, number>();
+    const segmentsByOrder = new Map<number, { start_date: Date; end_date: Date }>();
     const dayDates = new Map<string, number>();
     const { project, segments, days } = value;
+
+    if (project.end_date !== null && project.end_date.getTime() < project.start_date.getTime()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["project", "end_date"],
+        message: "project.end_date cannot be before project.start_date",
+      });
+    }
 
     if (project.has_plan_structure === "open") {
       if ((segments?.length ?? 0) > 0) {
@@ -108,6 +117,34 @@ const rawPlanYamlSchema = z
         });
       } else {
         segmentOrders.set(segment.order, index);
+        segmentsByOrder.set(segment.order, {
+          start_date: segment.start_date,
+          end_date: segment.end_date,
+        });
+      }
+
+      if (segment.end_date.getTime() < segment.start_date.getTime()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["segments", index, "end_date"],
+          message: `segment order ${segment.order} ends before it starts`,
+        });
+      }
+
+      if (segment.start_date.getTime() < project.start_date.getTime()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["segments", index, "start_date"],
+          message: `segment order ${segment.order} starts before project.start_date`,
+        });
+      }
+
+      if (project.end_date !== null && segment.end_date.getTime() > project.end_date.getTime()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["segments", index, "end_date"],
+          message: `segment order ${segment.order} ends after project.end_date`,
+        });
       }
     }
 
@@ -147,6 +184,15 @@ const rawPlanYamlSchema = z
           path: ["days", index, "segment_order"],
           message: `segment_order ${day.segment_order} does not match any segment.order`,
         });
+      } else {
+        const segment = segmentsByOrder.get(day.segment_order);
+        if (segment && !isWithinRange(day.date, segment.start_date, segment.end_date)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["days", index, "date"],
+            message: `day date ${dateKey} falls outside segment ${day.segment_order} range`,
+          });
+        }
       }
     }
   });
@@ -229,6 +275,10 @@ function formatYamlParseDetail(
 function formatValidationIssue(issue: z.ZodIssue): string {
   const path = issue.path.length > 0 ? issue.path.join(".") : "<root>";
   return `${path}: ${issue.message}`;
+}
+
+function isWithinRange(date: Date, start: Date, end: Date): boolean {
+  return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
 }
 
 if (import.meta.vitest) {
@@ -429,6 +479,94 @@ days:
       );
     });
 
+    it("rejects a project whose end_date is before start_date", () => {
+      expectSeedError(
+        () =>
+          parsePlanYamlSource(
+            `
+project:
+  name: "Broken project"
+  start_date: 2026-05-07
+  end_date: 2026-05-03
+  has_plan_structure: open
+`,
+            "broken-project.yaml",
+          ),
+        /yaml validation failed in broken-project\.yaml/,
+        /project\.end_date cannot be before project\.start_date/,
+      );
+    });
+
+    it("rejects a segment whose end_date is before start_date", () => {
+      expectSeedError(
+        () =>
+          parsePlanYamlSource(
+            `
+project:
+  name: "Broken segment"
+  start_date: 2026-05-03
+  end_date: 2026-05-07
+  has_plan_structure: segments
+segments:
+  - order: 1
+    name: "Phase 1"
+    start_date: 2026-05-05
+    end_date: 2026-05-04
+    goals: []
+`,
+            "broken-segment.yaml",
+          ),
+        /yaml validation failed in broken-segment\.yaml/,
+        /segment order 1 ends before it starts/,
+      );
+    });
+
+    it("rejects segments outside the project range", () => {
+      expectSeedError(
+        () =>
+          parsePlanYamlSource(
+            `
+project:
+  name: "Out of range segment"
+  start_date: 2026-05-03
+  end_date: 2026-05-07
+  has_plan_structure: segments
+segments:
+  - order: 1
+    name: "Phase 1"
+    start_date: 2026-05-02
+    end_date: 2026-05-04
+    goals: []
+`,
+            "out-of-range-segment.yaml",
+          ),
+        /yaml validation failed in out-of-range-segment\.yaml/,
+        /starts before project\.start_date/,
+      );
+
+      expectSeedError(
+        () =>
+          parsePlanYamlSource(
+            `
+project:
+  name: "Out of range segment"
+  start_date: 2026-05-03
+  end_date: 2026-05-07
+  has_plan_structure: segments
+segments:
+  - order: 1
+    name: "Phase 1"
+    start_date: 2026-05-03
+    end_date: 2026-05-08
+    goals: []
+`,
+            "out-of-range-segment.yaml",
+          ),
+        /yaml validation failed in out-of-range-segment\.yaml/,
+        /ends after project\.end_date/,
+      );
+    });
+
     it("rejects a day whose segment_order does not exist", () => {
       expectSeedError(
         () =>
@@ -454,6 +592,35 @@ days:
         ),
         /yaml validation failed in bad-segment-order\.yaml/,
         /does not match any segment\.order/,
+      );
+    });
+
+    it("rejects a day that falls outside its segment range", () => {
+      expectSeedError(
+        () =>
+          parsePlanYamlSource(
+            `
+project:
+  name: "Day outside segment"
+  start_date: 2026-05-03
+  end_date: 2026-05-07
+  has_plan_structure: full
+segments:
+  - order: 1
+    name: "Phase 1"
+    start_date: 2026-05-03
+    end_date: 2026-05-04
+    goals: []
+days:
+  - date: 2026-05-05
+    segment_order: 1
+    title: "Day 3"
+    planned_tasks: []
+`,
+            "day-outside-segment.yaml",
+          ),
+        /yaml validation failed in day-outside-segment\.yaml/,
+        /falls outside segment 1 range/,
       );
     });
 

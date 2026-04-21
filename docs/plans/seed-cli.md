@@ -440,6 +440,10 @@ All must pass before close-out.
   `build` green. Manual smoke steps 1–9 also ran against `dev.db`,
   including the loud segment/day blast-radius cases and preserved
   orphan verification with an existing `DailyLog`.
+- 2026-04-21 — Fresh-context review found two issues before close-out:
+  segment blast-radius understated daily-log impact when no `PlanDay`
+  row existed, and yaml validation still accepted contradictory
+  timelines. Both were fixed before final handoff and re-verified.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its

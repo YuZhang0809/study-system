@@ -102,7 +102,7 @@ As of 2026-04-21 after `seed-cli`:
 
 - `cd web && npm run typecheck` — green
 - `cd web && npm run lint` — green
-- `cd web && npm test` — 16 test files, 46 tests, all green
+- `cd web && npm test` — 16 test files, 51 tests, all green
 - `cd web && npm run build` — green (all 8 routes prerendered
   static)
 - `cd web && npm run seed -- tests/fixtures/seed-smoke.yaml --dry-run`

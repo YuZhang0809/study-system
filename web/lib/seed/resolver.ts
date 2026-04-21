@@ -105,8 +105,7 @@ export function resolveSeedPlan(plan: PlanYaml, snapshot: SeedReaderSnapshot): S
       name: segment.name,
       startDate: formatDateOnly(segment.startDate),
       endDate: formatDateOnly(segment.endDate),
-      daysInRangeWithDailyLogs: countDaysInRangeWithDailyLogs(
-        snapshot.days,
+      daysInRangeWithDailyLogs: countDailyLogsInRange(
         snapshot.dailyLogsByDate,
         segment.startDate,
         segment.endDate,
@@ -179,8 +178,7 @@ function resolveSegmentPlan(
       userImpact: {
         retros: 0,
         daysInRange: countDaysInRange(snapshot.days, undefined, undefined, segment.startDate, segment.endDate),
-        daysInRangeWithDailyLogs: countDaysInRangeWithDailyLogs(
-          snapshot.days,
+        daysInRangeWithDailyLogs: countDailyLogsInRange(
           snapshot.dailyLogsByDate,
           undefined,
           undefined,
@@ -215,8 +213,7 @@ function resolveSegmentPlan(
         segment.startDate,
         segment.endDate,
       ),
-      daysInRangeWithDailyLogs: countDaysInRangeWithDailyLogs(
-        snapshot.days,
+      daysInRangeWithDailyLogs: countDailyLogsInRange(
         snapshot.dailyLogsByDate,
         existing.startDate,
         existing.endDate,
@@ -331,21 +328,22 @@ function countDaysInRange(
   return days.filter((day) => isWithinEitherRange(day.date, oldStart, oldEnd, newStart, newEnd)).length;
 }
 
-function countDaysInRangeWithDailyLogs(
-  days: ExistingDayRecord[],
+function countDailyLogsInRange(
   dailyLogsByDate: Record<string, number>,
   oldStart?: Date,
   oldEnd?: Date,
   newStart?: Date,
   newEnd?: Date,
 ): number {
-  return days.filter((day) => {
-    if (!isWithinEitherRange(day.date, oldStart, oldEnd, newStart, newEnd)) {
-      return false;
+  return Object.entries(dailyLogsByDate).reduce((total, [dateKey, count]) => {
+    if (count <= 0) {
+      return total;
     }
 
-    return (dailyLogsByDate[formatDateOnly(day.date)] ?? 0) > 0;
-  }).length;
+    return isWithinEitherRange(parseDateOnly(dateKey), oldStart, oldEnd, newStart, newEnd)
+      ? total + count
+      : total;
+  }, 0);
 }
 
 function isWithinEitherRange(
@@ -370,6 +368,10 @@ function isEqualValue(left: unknown, right: unknown): boolean {
 
 function formatDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function parseDateOnly(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
 }
 
 if (import.meta.vitest) {
@@ -645,6 +647,47 @@ if (import.meta.vitest) {
       };
 
       expect(() => resolveSeedPlan(plan, makeSnapshot())).toThrow(/missing segment_order 999/);
+    });
+
+    it("counts daily logs in shifted segment ranges even without plan_day rows", () => {
+      const plan = makePlan();
+      plan.segments[0] = {
+        ...plan.segments[0],
+        endDate: new Date("2026-05-05"),
+      };
+
+      const resolved = resolveSeedPlan(plan, {
+        project: {
+          id: "project-1",
+          name: plan.project.name,
+          startDate: plan.project.startDate,
+          endDate: plan.project.endDate,
+          hasPlanStructure: plan.project.hasPlanStructure,
+          status: plan.project.status,
+        },
+        segments: [
+          {
+            id: "segment-1",
+            projectId: "project-1",
+            order: 1,
+            name: "Phase 1",
+            startDate: new Date("2026-05-03"),
+            endDate: new Date("2026-05-04"),
+            goals: ["Ship scaffold"],
+          },
+        ],
+        days: [],
+        dailyLogsByDate: {
+          "2026-05-05": 1,
+        },
+        retrosBySegmentId: {},
+      });
+
+      expect(resolved.segments[0].userImpact).toEqual({
+        retros: 0,
+        daysInRange: 0,
+        daysInRangeWithDailyLogs: 1,
+      });
     });
   });
 }
