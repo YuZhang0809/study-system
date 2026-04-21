@@ -129,6 +129,14 @@ Unchanged from prior STATE.md except where noted:
 - Plan-yaml import UI vs CLI — still unresolved; the `seed-cli`
   slice explicitly defers the UI path, so v1 is CLI-only unless
   the PM pulls import into a later surface slice.
+- Fresh-context review on the landed `seed-cli` slice surfaced one
+  migration-scoped follow-up: the CLI now treats `Project.name` and
+  `PlanSegment(projectId, order)` as natural keys, but the Prisma
+  schema does not yet enforce them with unique constraints. Runtime
+  conflict checks exist, so single-user serial runs behave correctly,
+  but overlapping seed runs could still create duplicate rows before
+  those checks fire. Fix requires a schema decision + migration and is
+  therefore parked outside this slice.
 - Tweaks variation axes — unchanged.
 - Prisma 7 forced a few changes the plan did not anticipate:
   `url` moved from `schema.prisma` to `prisma.config.ts`, and
@@ -152,9 +160,10 @@ After `today-page-skeleton`, the intended slice order is
 
 ## Blockers
 
-None. The 12-day window is tight; the scaffold slice took roughly
-one working session so the remaining 10–11 days for features is on
-plan.
+No active execution blocker inside the landed `seed-cli` scope. The
+remaining notable risk is the parked natural-key migration above.
+The 12-day window is tight; the scaffold slice took roughly one
+working session so the remaining 10–11 days for features is on plan.
 
 ## Deferred / Upcoming
 

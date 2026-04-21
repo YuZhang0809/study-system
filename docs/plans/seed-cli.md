@@ -444,6 +444,13 @@ All must pass before close-out.
   segment blast-radius understated daily-log impact when no `PlanDay`
   row existed, and yaml validation still accepted contradictory
   timelines. Both were fixed before final handoff and re-verified.
+- 2026-04-21 — Final fresh-context review surfaced one remaining
+  migration-scoped risk outside this slice boundary: the CLI's
+  natural keys (`Project.name`, `PlanSegment(projectId, order)`) are
+  runtime-checked but not schema-enforced, so overlapping seed runs
+  could still create duplicates before the conflict path fires.
+  Because the current slice explicitly forbids Prisma schema changes,
+  this is parked for PM follow-up rather than fixed here.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its
