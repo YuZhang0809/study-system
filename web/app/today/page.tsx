@@ -117,7 +117,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
         <div className="today-ledger">
           <div className="today-column">
-            <DailyLogCompose projectId={project.id} today={today} initialValues={todayLog} />
+            <DailyLogCompose
+              key={`daily-log-${project.id}-${formatIsoDate(today)}-${todayLog?.updatedAt.toISOString() ?? "new"}`}
+              projectId={project.id}
+              today={today}
+              initialValues={todayLog}
+            />
             <Block heading="昨日之承诺 · 未结清">
               <YesterdayPromiseBlock
                 projectId={project.id}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { upsertDailyLog, type DailyLogActionResult } from "@/lib/daily-log/actions";
 import { formatHourMinute } from "@/lib/daily-log/presentation";
 import type { DailyLogRecord } from "@/lib/daily-log/queries";
@@ -29,14 +29,6 @@ export function DailyLogCompose({ projectId, today, initialValues }: DailyLogCom
   const [fieldErrors, setFieldErrors] = useState<DailyLogActionResult["fieldErrors"]>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setSavedLog(initialValues);
-    setFormState(toFormState(initialValues));
-    setIsExpanded(initialValues === null);
-    setFieldErrors({});
-    setSubmitError(null);
-  }, [initialValues]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

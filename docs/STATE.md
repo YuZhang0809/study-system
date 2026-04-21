@@ -4,27 +4,27 @@ Last updated: 2026-04-21
 
 ## Current Phase
 
-**`knowledge-capture-inline` is implementation-complete; fresh-context review is pending.**
+**`daily-log-flow` is implementation-complete; fresh-context review is
+next.**
 
-The active slice now lands a real `/knowledge` surface on top of the
-existing scaffold, schema, and Today page. The app can server-render a
-type-filtered knowledge ledger, open an inline compose card for all four
-`knowledge_item` types, validate and write new rows through a Next.js 16
-server action, derive collision-safe slugs, optionally attach one
-pointer-style `Artifact`, and revalidate both `/knowledge` and `/today`
-after submit.
+`/today` now renders the working day ledger instead of daily-log-flow
+placeholder copy. The page server-renders the active project's
+`今日日志` compose card, yesterday-promise carry-forward block,
+open-item list, and active-blocker list alongside the existing
+driving-seat sentence, timeline, fact strip, and `最近动静` feed. Daily
+log writes upsert on `(projectId, date)`, carry-forward is idempotent
+per the locked de-dup rule, and all four mutation surfaces validate at
+the Zod boundary before Prisma writes through Next.js 16 server
+actions.
 
-`/today` is no longer fully static in its right-hand column: the
-`最近动静` block now reads the active project's 5 most-recent
-`KnowledgeItem` rows and renders a live feed with type badge, title, and
-relative date. The other Today blocks remain intentionally empty-state
-until `daily-log-flow`.
+The preceding `knowledge-capture-inline` slice remains in place:
+`/knowledge` stays the primary inline capture surface for
+`knowledge_item`, and `/today`'s `最近动静` block still renders the
+active project's top-5 recent captures.
 
 The dogfood deadline is still **2026-05-03**. With
-`knowledge-capture-inline` implemented on `main`, the remaining v1 slices
-are `daily-log-flow`, `weekly-review-flow`, `retro-flow`, and
-`export-json-cli`, plus the fresh-context review and any follow-up fixes
-it finds.
+`daily-log-flow` implemented, the remaining v1 slices are
+`weekly-review-flow`, `retro-flow`, and `export-json-cli`.
 
 ## What Is True Now
 
@@ -34,9 +34,10 @@ it finds.
 - `AGENTS.md` + `web/AGENTS.md` remain the operating contract and command map
 - `docs/decisions/0001-design-handoff-reference.md` still locks the visual system
 - `docs/plans/archive/` holds the closed `scaffold-and-schema`,
-  `seed-cli`, and `today-page-skeleton` plans
-- `docs/plans/knowledge-capture-inline.md` is the active execution plan
-  and now contains the implementation progress log through M6
+  `seed-cli`, `today-page-skeleton`, and `knowledge-capture-inline`
+  plans
+- `docs/plans/daily-log-flow.md` is the active execution plan, now with
+  implementation progress logged through M4 and doc sync pending
 - `web/lib/knowledge/` now holds the knowledge slice server/data layer:
   `queries.ts`, `slug.ts`, `artifact-kind.ts`, and `actions.ts`
 - `web/components/knowledge/` now holds the knowledge slice UI
@@ -45,6 +46,14 @@ it finds.
 - `web/app/knowledge/page.tsx` plus
   `web/app/knowledge/_NewButtonRow.tsx` replace the `/knowledge`
   placeholder with the inline capture surface
+- `web/lib/daily-log/` now holds the daily-log slice server/data layer:
+  `queries.ts`, `actions.ts`, and `presentation.ts`
+- `web/components/daily-log/` now holds the day-ledger UI primitives:
+  compose card, chip editor, carry-forward button, open-item/blocker
+  blocks, and their inline action children
+- `web/app/today/page.tsx` now wires all four daily-log surfaces into
+  the left and right columns while keeping the fact strip and
+  `最近动静` feed unchanged
 - `web/components/today/RecentKnowledgeList.tsx` and
   `web/lib/today/relative-days.ts` light up `/today`'s `最近动静` block
 - `web/tests/knowledge-create.test.ts` covers direct server-action calls
@@ -53,8 +62,14 @@ it finds.
   artifact counts, and the 200-row cap against a temp SQLite DB
 - `web/tests/knowledge-page.test.tsx` renders `/knowledge` through RTL
   and covers counters, type-filter links, filtered rows, and empty state
+- `web/tests/daily-log-upsert.test.ts`,
+  `web/tests/daily-log-carry-forward.test.ts`,
+  `web/tests/open-items-actions.test.ts`, and
+  `web/tests/blockers-actions.test.ts` cover the new server actions
+  against temp SQLite DBs
 - `web/tests/today-page.test.tsx` now also covers the populated
-  `最近动静` state in addition to the earlier Today-shell assertions
+  `今日日志` / `昨日之承诺` / `未清账` / `阻塞` states in addition to the
+  earlier Today-shell assertions
 
 ### Runtime shape
 
@@ -80,56 +95,41 @@ Unchanged from the prior state:
 
 ## Verification Snapshot
 
-As of 2026-04-21 after the implementation milestones for
-`knowledge-capture-inline` landed locally on `main`:
+As of 2026-04-21 after `daily-log-flow` implementation completed
+locally:
 
 - `cd web && npm run typecheck` - green
 - `cd web && npm run lint` - green
-- `cd web && npm test` - green; 26 test files and 98 tests
+- `cd web && npm test` - green; 107 tests
 - `cd web && npm run build` - green; `/knowledge` and `/today` build as
   dynamic routes, while `/`, `/_not-found`, `/artifacts`, `/plan`,
   `/retros`, and `/settings` remain static
 
-Manual browser verification for the new `/knowledge` compose flow was
-not re-run in this implementation session. That is still appropriate
-follow-up work for the fresh-context review / fix pass, alongside any
-issues the reviewer finds.
+Manual browser verification was not run on this head. That is
+appropriate follow-up for the fresh-context reviewer and PM dogfood
+pass, not a blocker for opening review.
 
 ## Known Open Questions
 
 - `export-json-cli` is still required before dogfood trust per PRD §10
-- `daily-log-flow` still owns the remaining Today blocks
-  (`昨日之承诺`, `未清账`, `阻塞`)
 - the Today fact-strip's `累计 commits` read remains parked even though
-  this slice now writes `Artifact(kind = "commit")`
+  `knowledge-capture-inline` now writes `Artifact(kind = "commit")`
 - global `N` routing and Tweaks-axis resurrection remain parked until
   dogfood proves them necessary
 
 ## Recommended Next Step
 
-**Open a fresh-context Codex review session against the current `main`
-head and this slice's active plan.**
-
-The review should check:
-
-- anti-pattern compliance on the `/knowledge` form and `/today` feed
-- server-action correctness at the Zod boundary
-- slug collision handling and single-artifact writes
-- the in-memory SearchBox behavior versus the locked surface contract
-- verification quality and any missed edge cases in the new tests
-
-If review finds defects, fix them in a short follow-up slice before
-declaring `knowledge-capture-inline` closed and moving on to
-`daily-log-flow`.
+**Open the fresh-context review session for `daily-log-flow`.** Review
+focus should be anti-pattern compliance on `/today`, server-action
+validation boundaries, idempotent carry-forward behavior, and whether
+the page wiring stays within the locked surface contract.
 
 ## Blockers
 
-No active implementation blocker. The current blocker is procedural:
-fresh-context review has not happened yet.
+None.
 
 ## Deferred / Upcoming
 
-- `daily-log-flow`
 - `weekly-review-flow`
 - `retro-flow`
 - `export-json-cli`
