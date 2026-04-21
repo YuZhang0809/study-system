@@ -525,6 +525,13 @@ intentionally deferred to later slices._
   Surprising: this entry cannot embed its own final SHA before the
   commit exists; use the resulting doc-sync commit as the M6 sha in the
   close-out handoff.
+- 2026-04-21 — review follow-up — `55c96a8`
+  Fixed `inferArtifactKind()` so image URLs and paths with `?…` or `#…`
+  suffixes still classify as `screenshot`, while `/commit/` URLs keep
+  classifying as `commit`.
+  Surprising: the regression was isolated to the end-of-string image
+  extension check, so the narrowest safe fix was to strip query/fragment
+  suffixes only for that regex path and leave the other branches intact.
 
 ## Change Log
 
