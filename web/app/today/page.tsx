@@ -1,9 +1,20 @@
 import { Block } from "@/components/today/Block";
+import { BlockersBlock } from "@/components/daily-log/BlockersBlock";
+import { DailyLogCompose } from "@/components/daily-log/DailyLogCompose";
+import { OpenItemsBlock } from "@/components/daily-log/OpenItemsBlock";
+import { YesterdayPromiseBlock } from "@/components/daily-log/YesterdayPromiseBlock";
 import { DrivingSeat } from "@/components/today/DrivingSeat";
 import { Fact } from "@/components/today/Fact";
 import { FactStrip } from "@/components/today/FactStrip";
 import { RecentKnowledgeList } from "@/components/today/RecentKnowledgeList";
 import { Timeline } from "@/components/today/Timeline";
+import {
+  findCarriedForwardOpenItem,
+  getTodayLog,
+  getYesterdayPromise,
+  listActiveBlockers,
+  listOpenItems,
+} from "@/lib/daily-log/queries";
 import { listRecentKnowledgeForToday } from "@/lib/knowledge/queries";
 import { getPrismaClient } from "@/lib/prisma";
 import { resolveActiveProject } from "@/lib/today/active-project";
@@ -35,7 +46,16 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const prisma = getPrismaClient();
   const drivingSeat = buildDrivingSeatState(project, project.segments, today);
   const timeline = buildTimelineState(project, project.segments, today);
-  const [todayPlan, segmentCount, completedSegmentCount, recentKnowledge] = await Promise.all([
+  const [
+    todayPlan,
+    segmentCount,
+    completedSegmentCount,
+    recentKnowledge,
+    todayLog,
+    yesterdayPromise,
+    openItems,
+    blockers,
+  ] = await Promise.all([
     prisma.planDay.findUnique({
       where: {
         projectId_date: {
@@ -56,7 +76,14 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       },
     }),
     listRecentKnowledgeForToday(project.id, prisma),
+    getTodayLog(project.id, today, prisma),
+    getYesterdayPromise(project.id, today, prisma),
+    listOpenItems(project.id, prisma),
+    listActiveBlockers(project.id, prisma),
   ]);
+  const carriedForwardItem = yesterdayPromise
+    ? await findCarriedForwardOpenItem(project.id, yesterdayPromise.text, prisma)
+    : null;
 
   const segmentFactLabel = drivingSeat.activeSegment
     ? `${drivingSeat.activeSegment.name} 还剩`
@@ -90,8 +117,13 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
         <div className="today-ledger">
           <div className="today-column">
+            <DailyLogCompose projectId={project.id} today={today} initialValues={todayLog} />
             <Block heading="昨日之承诺 · 未结清">
-              <p className="today-empty">尚未记录 · daily-log-flow 落地后会显示昨日留下的第一件事</p>
+              <YesterdayPromiseBlock
+                projectId={project.id}
+                text={yesterdayPromise?.text ?? null}
+                canCarryForward={Boolean(yesterdayPromise) && !carriedForwardItem}
+              />
             </Block>
             <Block heading={todayLabel} ruled>
               {todayPlan ? (
@@ -124,10 +156,10 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
           <div className="today-column">
             <Block heading="未清账">
-              <p className="today-empty">尚未记录 · daily-log-flow 落地后会挂出未结清条目</p>
+              <OpenItemsBlock projectId={project.id} openItems={openItems} />
             </Block>
             <Block heading="阻塞">
-              <p className="today-empty">尚未记录 · 阻塞会在 daily-log-flow / 手动记录时出现</p>
+              <BlockersBlock projectId={project.id} blockers={blockers} />
             </Block>
           </div>
         </div>
