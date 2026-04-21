@@ -415,6 +415,11 @@ All must pass before close-out.
   wired `npm run seed`, and created `web/scripts/seed.ts` with
   positional-path / `--dry-run` argv parsing plus the locked exit-code
   / stderr formatting shape for later milestones to fill in.
+- 2026-04-21 — M2 landed: added `web/lib/seed/plan-yaml-schema.ts`
+  with snake_case yaml parsing, validation, and in-source tests.
+  Import-layer translation preserves the locked yaml contract
+  (`has_plan_structure: segments`) while mapping to the already-landed
+  DB enum value `segments_only`; no Prisma schema change required.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its

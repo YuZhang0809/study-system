@@ -1,28 +1,12 @@
-type ExitCode = 0 | 1 | 2 | 3 | 4;
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { SeedError, type SeedExitCode, isSeedError } from "../lib/seed/error";
+import { parsePlanYamlSource } from "../lib/seed/plan-yaml-schema";
 
 type SeedCliArgs = {
   planPath: string;
   dryRun: boolean;
 };
-
-class SeedError extends Error {
-  readonly exitCode: Exclude<ExitCode, 0>;
-  readonly details: string[];
-  readonly causeValue?: unknown;
-
-  constructor(
-    exitCode: Exclude<ExitCode, 0>,
-    message: string,
-    details: string[] = [],
-    causeValue?: unknown,
-  ) {
-    super(message);
-    this.name = "SeedError";
-    this.exitCode = exitCode;
-    this.details = details;
-    this.causeValue = causeValue;
-  }
-}
 
 function parseCliArgs(argv: readonly string[]): SeedCliArgs {
   let planPath: string | null = null;
@@ -60,8 +44,29 @@ function parseCliArgs(argv: readonly string[]): SeedCliArgs {
 }
 
 async function runSeed(args: SeedCliArgs): Promise<void> {
-  throw new SeedError(1, "seed CLI is not implemented yet", [
-    `yaml path: ${args.planPath}`,
+  const sourcePath = path.resolve(process.cwd(), args.planPath);
+
+  let source: string;
+  try {
+    source = await readFile(sourcePath, "utf8");
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new SeedError(1, `yaml file not found: ${args.planPath}`, [`resolved path: ${sourcePath}`], error);
+    }
+
+    throw new SeedError(
+      1,
+      `failed to read yaml file: ${args.planPath}`,
+      [`resolved path: ${sourcePath}`],
+      error,
+    );
+  }
+
+  const plan = parsePlanYamlSource(source, sourcePath);
+
+  throw new SeedError(3, "seed resolver is not implemented yet", [
+    `yaml path: ${sourcePath}`,
+    `project: ${plan.project.name}`,
     `dry run: ${args.dryRun ? "yes" : "no"}`,
   ]);
 }
@@ -80,7 +85,7 @@ function printError(error: SeedError): void {
 }
 
 function normalizeError(error: unknown): SeedError {
-  if (error instanceof SeedError) {
+  if (isSeedError(error)) {
     return error;
   }
 
@@ -101,7 +106,7 @@ function normalizeError(error: unknown): SeedError {
   );
 }
 
-async function main(): Promise<ExitCode> {
+async function main(): Promise<SeedExitCode> {
   const args = parseCliArgs(process.argv.slice(2));
   await runSeed(args);
   return 0;
