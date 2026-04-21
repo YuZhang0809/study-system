@@ -6,7 +6,12 @@ type IconName =
   | "artifacts"
   | "settings"
   | "plus"
-  | "search";
+  | "search"
+  | "close"
+  | "bug"
+  | "concept"
+  | "prompt"
+  | "learning";
 
 interface IconProps {
   name: IconName;
@@ -77,6 +82,39 @@ export function Icon({ name, size = 14, className }: IconProps) {
         <svg {...common}>
           <circle cx="7" cy="7" r="3.5" />
           <path d="M10 10l3 3" />
+        </svg>
+      );
+    case "close":
+      return (
+        <svg {...common}>
+          <path d="M4 4l8 8 M12 4l-8 8" />
+        </svg>
+      );
+    case "bug":
+      return (
+        <svg {...common}>
+          <path d="M5 6a3 3 0 016 0v3a3 3 0 01-6 0z M3 7h2 M11 7h2 M3 10h2 M11 10h2 M8 3V2" />
+        </svg>
+      );
+    case "prompt":
+      return (
+        <svg {...common}>
+          <path d="M3 4h10v7H7l-3 2.5V11H3z" />
+        </svg>
+      );
+    case "concept":
+      return (
+        <svg {...common}>
+          <circle cx="5" cy="5" r="1.5" />
+          <circle cx="11" cy="5" r="1.5" />
+          <circle cx="8" cy="11" r="1.5" />
+          <path d="M6.2 5h3.6 M5.8 6L7.3 9.8 M10.2 6L8.7 9.8" />
+        </svg>
+      );
+    case "learning":
+      return (
+        <svg {...common}>
+          <path d="M3 4.5l5-2 5 2v2l-5 2-5-2z M3 9.5l5 2 5-2 M8 6.5V13" />
         </svg>
       );
   }
