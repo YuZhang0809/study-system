@@ -7,7 +7,6 @@ import { blockerCreate } from "../schemas/blocker";
 import { dailyLogCreate } from "../schemas/daily-log";
 import { openItemCreate } from "../schemas/open-item";
 import { startOfLocalDay } from "../today/driving-seat";
-import { findCarriedForwardOpenItem, getYesterdayPromise } from "./queries";
 
 const dailyLogActionSchema = dailyLogCreate.extend({
   projectId: z.string().trim().min(1, "项目缺失"),
@@ -32,13 +31,6 @@ const createOpenItemSchema = openItemCreate.extend({
   projectId: z.string().trim().min(1, "项目缺失"),
   text: z.string().trim().min(1, "内容必填").max(500, "内容最多 500 字"),
   source: z.literal("manual"),
-  status: z.literal("open"),
-});
-
-const carryForwardOpenItemSchema = openItemCreate.extend({
-  projectId: z.string().trim().min(1, "项目缺失"),
-  text: z.string().trim().min(1, "内容必填").max(500, "内容最多 500 字"),
-  source: z.literal("daily_log"),
   status: z.literal("open"),
 });
 
@@ -120,68 +112,6 @@ export async function upsertDailyLog(formData: FormData): Promise<DailyLogAction
       tomorrowFirstThing: payload.tomorrowFirstThing,
       honestyNote: payload.honestyNote,
     },
-  });
-
-  revalidatePath("/today");
-
-  return { ok: true };
-}
-
-export async function carryForwardYesterdayPromise({
-  projectId,
-}: {
-  projectId: string;
-}): Promise<RowActionResult> {
-  const baseParsed = z
-    .object({
-      projectId: z.string().trim().min(1, "项目缺失"),
-    })
-    .safeParse({ projectId });
-
-  if (!baseParsed.success) {
-    return {
-      ok: false,
-      fieldErrors: baseParsed.error.flatten().fieldErrors,
-    };
-  }
-
-  const today = startOfLocalDay(new Date());
-  const prisma = getPrismaClient();
-  const promise = await getYesterdayPromise(baseParsed.data.projectId, today, prisma);
-
-  if (!promise) {
-    revalidatePath("/today");
-    return { ok: true };
-  }
-
-  const openItemParsed = carryForwardOpenItemSchema.safeParse({
-    projectId: baseParsed.data.projectId,
-    text: promise.text,
-    openedAt: today,
-    source: "daily_log",
-    status: "open",
-  });
-
-  if (!openItemParsed.success) {
-    return {
-      ok: false,
-      fieldErrors: openItemParsed.error.flatten().fieldErrors,
-    };
-  }
-
-  const existing = await findCarriedForwardOpenItem(
-    openItemParsed.data.projectId,
-    openItemParsed.data.text,
-    prisma,
-  );
-
-  if (existing) {
-    revalidatePath("/today");
-    return { ok: true, deduped: true };
-  }
-
-  await prisma.openItem.create({
-    data: openItemParsed.data,
   });
 
   revalidatePath("/today");

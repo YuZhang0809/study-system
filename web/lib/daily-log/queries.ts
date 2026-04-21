@@ -104,6 +104,30 @@ export async function getYesterdayPromise(
   return text ? { text } : null;
 }
 
+export async function getTodayPlannedTasks(
+  projectId: string,
+  today: Date,
+  prisma: DailyLogQueryPrisma = getPrismaClient(),
+): Promise<string[]> {
+  const row = await prisma.planDay.findUnique({
+    where: {
+      projectId_date: {
+        projectId,
+        date: startOfLocalDay(today),
+      },
+    },
+    select: {
+      plannedTasks: true,
+    },
+  });
+
+  if (!row || !Array.isArray(row.plannedTasks)) {
+    return [];
+  }
+
+  return row.plannedTasks.filter((task): task is string => typeof task === "string");
+}
+
 export async function listOpenItems(
   projectId: string,
   prisma: DailyLogQueryPrisma = getPrismaClient(),
@@ -159,34 +183,6 @@ export async function listActiveBlockers(
     items: rows.slice(0, LIST_LIMIT),
     truncated: rows.length > LIST_LIMIT,
   };
-}
-
-export async function findCarriedForwardOpenItem(
-  projectId: string,
-  text: string,
-  prisma: DailyLogQueryPrisma = getPrismaClient(),
-): Promise<OpenItemRecord | null> {
-  const row = await prisma.openItem.findFirst({
-    where: {
-      projectId,
-      text,
-      source: "daily_log",
-      status: "open",
-    },
-    orderBy: {
-      openedAt: "desc",
-    },
-    select: {
-      id: true,
-      projectId: true,
-      text: true,
-      openedAt: true,
-      source: true,
-      status: true,
-    },
-  });
-
-  return row ?? null;
 }
 
 export function getPreviousLocalDay(today: Date): Date {
