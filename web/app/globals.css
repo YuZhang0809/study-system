@@ -36,6 +36,7 @@
   --sans:   -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
             'PingFang SC', 'Helvetica Neue', 'Segoe UI', 'Hiragino Sans',
             'Microsoft YaHei', system-ui, sans-serif;
+  --serif:  var(--sans);
   --mono:   'SF Mono', ui-monospace, SFMono-Regular, 'JetBrains Mono',
             Menlo, Consolas, monospace;
 
@@ -149,9 +150,19 @@ button {
 /* ---------- Utility classes (copied from the design bundle) ---------- */
 
 .mono  { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.serif { font-family: var(--serif); }
 
 .caps  { text-transform: uppercase; letter-spacing: 0.08em; }
 .num   { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+.t-xs  { font-size: var(--t-xs); }
+.t-sm  { font-size: var(--t-sm); }
+.t-md  { font-size: var(--t-md); }
+.t-lg  { font-size: var(--t-lg); }
+
+.ink-2 { color: var(--ink-2); }
+.ink-3 { color: var(--ink-3); }
+.ink-4 { color: var(--ink-4); }
 
 .rule-t { border-top: 1px solid var(--rule); }
 .rule-b { border-bottom: 1px solid var(--rule); }
@@ -269,6 +280,8 @@ button {
   cursor: pointer;
   border-left: 2px solid transparent;
   transition: background 0.1s;
+  color: inherit;
+  text-decoration: none;
 }
 
 .proj-item:hover { background: var(--paper-2); }
@@ -414,6 +427,153 @@ button {
   color: var(--ink-4);
   font-family: var(--sans);
   padding: 8px 0;
+}
+
+.card {
+  background: var(--paper-2);
+  border: 1px solid var(--paper-edge);
+  padding: 14px 16px;
+}
+
+.card--ruled {
+  background:
+    linear-gradient(var(--paper-2), var(--paper-2)),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 21px,
+      var(--rule) 21px,
+      var(--rule) 21.5px
+    );
+  background-blend-mode: multiply;
+}
+
+.block-label {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.block-label::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  background: var(--ink-3);
+  border-radius: 50%;
+  flex: none;
+}
+
+.block-label .count {
+  color: var(--ink-4);
+}
+
+.today-driving-seat {
+  margin: 0;
+  color: var(--ink-2);
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  line-height: 1.5;
+}
+
+.today-timeline-marker {
+  margin-top: 12px;
+  color: var(--ink-3);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.today-timeline-band {
+  list-style: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  margin: 14px 0 0;
+  padding: 0;
+  min-height: 14px;
+}
+
+.today-timeline-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 14px;
+  background: var(--paper-3);
+}
+
+.today-timeline-cell.is-today {
+  background: var(--amber);
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.today-timeline-boundary {
+  position: absolute;
+  left: -1px;
+  top: -4px;
+  bottom: -4px;
+  border-left: 1px solid var(--rule-strong);
+}
+
+.today-fact-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--rule);
+}
+
+.today-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.today-fact-value {
+  color: var(--ink);
+}
+
+.today-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.today-list li + li {
+  border-top: 1px dashed var(--rule);
+}
+
+.today-list-item {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.today-list-index {
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  line-height: 1.6;
+}
+
+.today-empty {
+  color: var(--ink-4);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  line-height: 1.5;
 }
 
 .app-body::-webkit-scrollbar { width: 10px; height: 10px; }

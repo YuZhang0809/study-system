@@ -1,13 +1,9 @@
-"use client";
+import { listSidebarProjects } from "@/lib/today/active-project";
+import { ProjectListActive } from "./ProjectListActive";
+import { SidebarNav } from "./SidebarNav";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Icon } from "./Icon";
-import { surfaces, surfaceForPath } from "@/lib/surfaces";
-
-export function Sidebar() {
-  const pathname = usePathname();
-  const active = surfaceForPath(pathname)?.id;
+export async function Sidebar() {
+  const projects = await listSidebarProjects();
 
   return (
     <aside className="sidebar">
@@ -18,30 +14,22 @@ export function Sidebar() {
 
       <div>
         <div className="section-label">项目</div>
-        <ul className="proj-list">
-          <li className="proj-item" aria-current={false}>
-            <span className="empty">还没有项目</span>
-          </li>
-        </ul>
+        {projects.length === 0 ? (
+          <ul className="proj-list">
+            <li>
+              <span className="proj-item">
+                <span className="empty">还没有项目</span>
+              </span>
+            </li>
+          </ul>
+        ) : (
+          <ProjectListActive projects={projects} />
+        )}
       </div>
 
       <div>
         <div className="section-label">导航</div>
-        <ul className="nav">
-          {surfaces.map((s) => (
-            <li key={s.id}>
-              <Link
-                href={s.path}
-                className="nav-item"
-                aria-current={active === s.id ? "true" : undefined}
-              >
-                <Icon name={s.icon} />
-                <span>{s.label}</span>
-                <span className="kbd">{s.shortcut}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <SidebarNav />
       </div>
 
       <div className="mt-auto px-4 pb-3 pt-3 rule-t">
