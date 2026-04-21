@@ -9,7 +9,7 @@ export default defineConfig({
       "components/**/*.test.{ts,tsx}",
       "tests/**/*.test.ts",
     ],
-    includeSource: ["lib/schemas/**/*.ts", "lib/seed/**/*.ts"],
+    includeSource: ["lib/schemas/**/*.ts", "lib/seed/**/*.ts", "lib/today/**/*.ts"],
   },
   define: {
     "import.meta.vitest": "undefined",
