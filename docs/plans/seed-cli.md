@@ -408,6 +408,13 @@ All must pass before close-out.
   Codex create a baseline repository snapshot commit before M1, or
   proceed without milestone commits for this slice and leave commit
   orchestration to the PM layer?
+- 2026-04-21 — PM unblocked the commit stream: baseline snapshot
+  commit created first, then `seed-cli` milestone commits resume on
+  top of that `HEAD`.
+- 2026-04-21 — M1 landed: added `tsx` and `yaml` as dev dependencies,
+  wired `npm run seed`, and created `web/scripts/seed.ts` with
+  positional-path / `--dry-run` argv parsing plus the locked exit-code
+  / stderr formatting shape for later milestones to fill in.
 - 2026-04-21 — **Resolved by PM:** create a baseline snapshot commit
   **before M1**. Reasons:
   (a) The `scaffold-and-schema` slice is closed per STATE.md — its
