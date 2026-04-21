@@ -108,10 +108,10 @@ describe("/today page", () => {
     expect(screen.getByText("Parse yaml")).toBeTruthy();
     expect(screen.getByText("Run integration test")).toBeTruthy();
 
-    expect(screen.getByText("尚未记录 — daily-log-flow 落地后会显示昨日留下的第一件事")).toBeTruthy();
-    expect(screen.getByText("尚未记录 — knowledge-capture-inline 落地后会显示最近沉淀")).toBeTruthy();
-    expect(screen.getByText("尚未记录 — daily-log-flow 落地后会挂出未结清条目")).toBeTruthy();
-    expect(screen.getByText("尚未记录 — 阻塞会在 daily-log-flow / 手动记录时出现")).toBeTruthy();
+    expect(screen.getByText("尚未记录 · daily-log-flow 落地后会显示昨日留下的第一件事")).toBeTruthy();
+    expect(screen.getByText("尚未记录 · 用 /knowledge 新建第一条")).toBeTruthy();
+    expect(screen.getByText("尚未记录 · daily-log-flow 落地后会挂出未结清条目")).toBeTruthy();
+    expect(screen.getByText("尚未记录 · 阻塞会在 daily-log-flow / 手动记录时出现")).toBeTruthy();
   });
 
   it("uses the local calendar day for early-morning request times", async () => {

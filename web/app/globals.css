@@ -705,6 +705,32 @@ button {
   padding: 8px 0;
 }
 
+.today-knowledge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.today-knowledge-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.today-knowledge-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-knowledge-date {
+  flex: none;
+}
+
 .today-list-index {
   color: var(--ink-4);
   font-family: var(--mono);
