@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { listSidebarProjects } from "@/lib/today/active-project";
 import { ProjectListActive } from "./ProjectListActive";
 import { SidebarNav } from "./SidebarNav";
@@ -23,7 +24,9 @@ export async function Sidebar() {
             </li>
           </ul>
         ) : (
-          <ProjectListActive projects={projects} />
+          <Suspense fallback={<ProjectListFallback projects={projects} />}>
+            <ProjectListActive projects={projects} />
+          </Suspense>
         )}
       </div>
 
@@ -40,5 +43,23 @@ export async function Sidebar() {
         </div>
       </div>
     </aside>
+  );
+}
+
+function ProjectListFallback({
+  projects,
+}: {
+  projects: Awaited<ReturnType<typeof listSidebarProjects>>;
+}) {
+  return (
+    <ul className="proj-list">
+      {projects.map((project) => (
+        <li key={project.id}>
+          <a href={`/today?project=${project.id}`} className="proj-item">
+            <span className="proj-name">{project.name}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }

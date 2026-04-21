@@ -533,8 +533,8 @@ button {
 
 .today-fact {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 6px;
   color: var(--ink-2);
   font-family: var(--mono);
   font-size: var(--t-sm);
@@ -574,6 +574,28 @@ button {
   font-family: var(--sans);
   font-size: var(--t-md);
   line-height: 1.5;
+}
+
+.today-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.today-overview {
+  padding: 16px 20px;
+}
+
+.today-ledger {
+  display: grid;
+  grid-template-columns: 1.05fr 1.15fr 1fr;
+  gap: 22px;
+}
+
+.today-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .app-body::-webkit-scrollbar { width: 10px; height: 10px; }
