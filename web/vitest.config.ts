@@ -12,7 +12,13 @@ export default defineConfig({
       "components/**/*.test.{ts,tsx}",
       "tests/**/*.test.{ts,tsx}",
     ],
-    includeSource: ["lib/schemas/**/*.ts", "lib/seed/**/*.ts", "lib/today/**/*.ts", "lib/knowledge/**/*.ts"],
+    includeSource: [
+      "lib/schemas/**/*.ts",
+      "lib/seed/**/*.ts",
+      "lib/today/**/*.ts",
+      "lib/knowledge/**/*.ts",
+      "lib/retro/**/*.ts",
+    ],
   },
   define: {
     "import.meta.vitest": "undefined",
