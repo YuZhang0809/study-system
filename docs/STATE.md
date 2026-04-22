@@ -222,13 +222,17 @@ returned `approve` at head `9a52828`):
 
 ## Recommended Next Step
 
-**Scope `export-json-cli`.** `retro-flow` is closed at `9a52828`;
-the local-DB chore is done; the real runtime boots clean. This is
-the final v1 slice before the 2026-05-03 dogfood deadline.
-`export-json-cli` does not add a Prisma migration, so decision
-0002's two extra verifier lines don't apply to it; it will,
-however, be the first slice whose handoff template gets reviewed
-against decision 0002's reviewer-check rule (rule 4).
+**Hand `export-json` to Codex.** Plan drafted at
+`docs/plans/export-json.md` (2026-04-22). PM Q1–Q8 resolved: the
+slice delivers a Settings-page「导出 JSON」button (not a CLI),
+browser-downloads a flat envelope JSON file containing the eight
+user-authored tables plus `_prisma_migrations` as a version
+marker, byte-deterministic per-DB, with a restrained one-line UI
+summary after download. M1 is a one-line edit to PRD §10 relaxing
+the literal "CLI" wording; the CLI form moves to v1.1 backlog.
+No schema change, so decision 0002's two extra verifier lines do
+not apply. This is the final v1 slice before the 2026-05-03
+dogfood deadline.
 
 ## Blockers
 
@@ -236,6 +240,14 @@ None.
 
 ## Deferred / Upcoming
 
-- `export-json-cli` — final v1 slice before dogfood
+- `export-json` — plan drafted 2026-04-22, awaiting Codex handoff;
+  final v1 slice before dogfood
+- v1.1 backlog (post-dogfood):
+  - CLI form of the JSON export
+  - Settings page UX polish: DB path / size readouts, the parked
+    「导入 YAML」 /「打开目录」 buttons
+  - Auto-scheduled backup (picks up the "last backup / next
+    auto-backup" copy from the design mockup)
+  - Import / restore slice (reverse direction of `export-json`)
 - v2-only AI roles (Coach / Historian / Scout / Principle mirror)
 - multi-user, cloud sync, mobile, and collaboration remain out of scope
