@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { PhaseRetroList } from "@/components/retro/PhaseRetroList";
 import { PhaseRetroWizard } from "@/components/retro/PhaseRetroWizard";
 import type { RetroMetricsInput, RetroSelfScoresInput } from "@/lib/schemas/retro";
@@ -25,15 +26,15 @@ export function PhaseRetroEntry({
   isWizardOpen,
   listHref,
 }: PhaseRetroEntryProps) {
+  const router = useRouter();
+
   if (isWizardOpen && eligibleSegment && metrics) {
     return (
       <PhaseRetroWizard
         segment={eligibleSegment}
         metrics={metrics}
         previousScores={previousScores}
-        onExit={() => {
-          window.location.href = listHref;
-        }}
+        onExit={() => router.replace(listHref, { scroll: false })}
       />
     );
   }

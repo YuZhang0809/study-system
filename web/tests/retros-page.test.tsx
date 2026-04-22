@@ -17,6 +17,12 @@ vi.mock("@/lib/retro/actions", () => ({
   upsertRetro: vi.fn(async () => ({ ok: true })),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+  }),
+}));
+
 const migrationsDir = path.resolve(__dirname, "..", "prisma", "migrations");
 
 let dbPath: string;
