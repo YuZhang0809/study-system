@@ -1,11 +1,53 @@
 # ExecPlan — daily-log-flow
 
-**Status:** open (direction change 2026-04-22 — rework in flight)
+**Status:** closed
 **Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-21
+**Closed:** 2026-04-22
 **Target close:** 2026-04-25 (≈ 1 more working session on top of
-the 355e704 baseline)
+the 355e704 baseline) — **actually closed 2026-04-22** after the v2
+rework and fresh-context review landed same-day.
+
+## Outcome
+
+Shipped. `/today` now renders the design-aligned shape:
+
+- Page-head `今日收工 ⌘↵` / `修改今日 ⌘↵` button opens a four-step
+  `EndOfDay` wizard modal. Step 1 pre-fills from
+  `PlanDay.plannedTasks`; step 2 pre-fills from yesterday's
+  `tomorrowFirstThing`; step 3 carries the 30/60/90/120/150/180/240
+  preset chips (no 7-day analytics); step 4 collects
+  `明日第一件事` + optional `诚实便签`. Submit upserts one `DailyLog`
+  per `(projectId, date)`.
+- `昨日之承诺` is read-only with a drift-colored `未兑现` label. No
+  button, no carry-forward path — the forward-flow happens inside
+  wizard step 2 pre-population.
+- `未清账` rows carry a `+{Nd}` overdue badge (drift color past 7
+  days). `未清账` / `阻塞` keep `+ 新增` + `[关闭]` / `[解除]` per
+  PM-Q3 γ.
+- All four anti-patterns still pass.
+
+Fresh-context review verdict: **`approve`** (no findings in scope).
+The review's earlier block on wizard-state plumbing was closed by a
+helper split in `web/lib/daily-log/wizard-state.ts` plus a new
+unchecked-ad-hoc upsert regression test.
+
+### Final verification
+
+- `cd web && npm run typecheck` — green (see caveat below)
+- `cd web && npm run lint` — green
+- `cd web && npm test` — green; 29 files / **108** tests
+- `cd web && npm run build` — green; `/today` remains dynamic (`ƒ`)
+
+### Known post-close note
+
+Running `npm run typecheck` on a clean workspace before
+`npm run build` can fail once in `.next/types/validator.ts` on a
+missing `./routes.js`, then pass after `next build`. This is a
+Next.js 16 generated-types artifact, not a product defect. Verifier
+order should be `build → typecheck` (or run `next typegen` first) if
+the `.next/types/` tree is missing. Not a blocker for close.
 
 ## Change log
 
@@ -658,4 +700,9 @@ short: milestone id, commit sha, one-line outcome._
 - M6 @ b515e97: Replaced inline compose with the EndOfDay wizard and read-only promise UI.
 - M7 @ 2ce6f6c: Wired the wizard, read-only promise block, and planned-task fetch into `/today`.
 - M8 @ 72f3b4d: Reshaped tests, removed carry-forward coverage, and fixed step-2 promise prefill found during smoke.
-- M9 @ see final handoff: Synced repo state docs; the commit's own sha is reported in handoff to avoid a self-referential amend.
+- M9 @ 60feb88: Synced repo state docs. (SHA recorded here post-commit; M9 itself could not embed its own hash without an amend.)
+- _(v2 shape complete at head 60feb88 on 2026-04-22; ready for
+  fresh-context review. Verification: typecheck / lint / build all
+  green; 29 files / 106 tests. Manual smoke via `next build` +
+  `next start` — dev port was held by an external process — covered
+  all six plan §Verification cases.)_

@@ -1,11 +1,60 @@
 # ExecPlan — weekly-review-flow
 
-**Status:** open
+**Status:** closed
 **Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-22
-**Target close:** 2026-04-25 (≈ 1–2 working sessions; well ahead of
-the 2026-05-03 dogfood deadline)
+**Closed:** 2026-04-22
+**Target close:** 2026-04-25 — **actually closed 2026-04-22**, same
+day as drafting, after M1–M5 + review-polish follow-up landed
+within one working session.
+
+## Outcome
+
+Shipped. `/retros` now hosts the live weekly-review surface:
+
+- Page-head `本周复盘 ⌘↵` / `修改本周 ⌘↵` primary button opens a
+  single-screen modal form. Six reflection textareas (all required,
+  1–2000 chars trimmed) on the left; six ink-tally segmented
+  score rows (clarity / honesty / output / depth / discipline /
+  energy, each 1–5) on the right. Submit upserts one `WeeklyLog`
+  per `(projectId, weekStart)`.
+- Modal header renders `{weekStartISO} → {weekEndISO}` only — no
+  `w{n}` ordinal (plan conflict resolved 2026-04-22; ordinals live
+  only on read-only list cards).
+- Q4 "上周留的钩子兑现了吗?" shows a muted `上周 Q6 · {text}`
+  reference line ABOVE the textarea when a previous-week log with
+  `weekStart === thisWeekStart - 7 days` exists. Textarea stays
+  empty on create — not ghostwriting.
+- `周记` tab renders a desc-by-weekStart card list matching the
+  design's `WeeklyLogList`. Empty state:
+  `还没写过周记 · 右上 本周复盘 开始`.
+- `阶段复盘` tab renders a placeholder `阶段复盘 · 下一刀做` card.
+  Phase retro surface is owned by `retro-flow`.
+- All four anti-patterns still pass.
+
+Fresh-context review verdict: **`approve`** (after two polish items
+landed in the follow-up commit `ea6c8ed`: `Sidebar.tsx`
+`ProjectListFallback` is no longer an interactive `/today?project=...`
+link; `WeeklyReviewModal.tsx` header no longer carries a duplicate
+`取消` button — close action is footer-only, matching the Surface
+contract).
+
+### Final verification
+
+At head `ea6c8ed`:
+
+- `cd web && npm run build` — green; `/retros` builds as `ƒ`
+  (dynamic) alongside `/today` and `/knowledge`
+- `cd web && npm run typecheck` — green
+- `cd web && npm run lint` — green
+- `cd web && npm test` — green; 119/119 tests (+11 from the
+  `daily-log-flow` 108 baseline)
+- Manual smoke on `next start` preview covered all six plan items
+  during implementation; re-smoke was skipped for the polish
+  follow-up because the diff was display-only (fallback markup +
+  modal header layout), touching no data flow, server action,
+  render logic, or routing.
 
 ## Goal
 

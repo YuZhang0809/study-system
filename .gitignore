@@ -33,3 +33,11 @@ Thumbs.db
 
 # Claude Code local tooling state
 .claude/
+
+# Local browser/debug artifacts
+.playwright-cli/
+web/.playwright-cli/
+web/output/
+web/prisma/manual-smoke-*.db*
+web/prisma/review-smoke-*.db*
+web/review-*.log

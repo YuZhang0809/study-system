@@ -1,10 +1,18 @@
 # ExecPlan — knowledge-capture-inline
 
-**Status:** open
-**Owner (impl):** Codex (to be handed off)
+**Status:** closed
+**Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-21
-**Target close:** 2026-04-23 (≈ 1–2 working sessions)
+**Closed:** 2026-04-21
+**Outcome:** shipped. Fresh-context review returned `needs fixes` on
+one narrow should-fix in `web/lib/knowledge/artifact-kind.ts`
+(query-string / fragment suffix on image URLs caused misclassification
+as `link`). Fix landed at `55c96a8f32cc17ac8fb35b65df7b72a53172fed5`
+with reviewer-specified tests; docs-only closure at
+`0196e4e3fc8955b80f5f73ef0ad769486084c0cb`. Full gate green; 100 tests.
+Re-review skipped by PM decision: fix was a pure-function change with
+reviewer-specified minimum diff and test cases, fully verified.
 
 ## Goal
 

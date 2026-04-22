@@ -1,10 +1,13 @@
 # ExecPlan — seed-cli
 
-**Status:** open
-**Owner (impl):** Codex (to be handed off)
+**Status:** closed
+**Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-21
-**Target close:** 2026-04-23 (≈ 2 working sessions)
+**Closed:** 2026-04-21
+**Outcome:** fresh-context review returned `ship`; closure commit
+`bb2180a8c3726b0130e54a05487e9fead3d0e835`. Final slice commit range
+on `main`: `b57ceb4` (M1) → `bb2180a` (review follow-up).
 
 ## Goal
 
@@ -500,6 +503,30 @@ All must pass before close-out.
   `npm run build`; manual smoke steps 1–9 reran on `web/prisma/dev.db`
   and passed, including step 8 (second project, different name) and
   step 9 (same name, different `start_date`, treated as UPDATE).
+- 2026-04-21 — Fresh-context review session opened (separate Codex
+  session, no prior context) over the commit range `8a3e181` →
+  `c064078`, using `docs/code_review.md`. Review surfaced three
+  findings, each fixed inside the same slice in commit
+  `bb2180a8c3726b0130e54a05487e9fead3d0e835`
+  (`fix(seed-cli): address review follow-ups`):
+  (a) `docs/STATE.md` was drifting post-`c064078`; synced;
+  (b) `P2002` translation in `web/scripts/seed.ts` needed
+  Prisma-7-+-SQLite-adapter-specific handling; made the uniqueness
+  path explicit on that stack;
+  (c) `web/tests/seed-cli.test.ts` lacked coverage for the two new
+  project-level natural-key paths; added.
+  Re-run verification sweep green:
+  `cd web && npm run typecheck` / `lint` / `test` (55 tests across
+  16 files) / `build`. Manual smoke **was not re-run** after the
+  follow-up pass; the earlier 1–9 manual smoke against `dev.db`
+  already covered the behavior surfaces this follow-up touched, and
+  the test suite now covers the added project-level natural-key
+  paths. Flagging this non-rerun for transparency.
+  Final reviewer verdict: `ship`.
+- 2026-04-21 — **Slice closed.** PM-layer closure: header flipped
+  to `Status: closed`, this Progress Log sealed, file moved to
+  `docs/plans/archive/seed-cli.md`. Next slice
+  (`today-page-skeleton`) opens in a new plan.
 
 ## Change Log
 

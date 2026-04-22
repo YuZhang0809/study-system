@@ -1,10 +1,11 @@
 # ExecPlan — today-page-skeleton
 
-**Status:** open
-**Owner (impl):** Codex (to be handed off)
+**Status:** closed
+**Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-21
-**Target close:** 2026-04-24 (≈ 2 working sessions)
+**Closed:** 2026-04-21
+**Outcome:** fresh-context review returned `ship`; closure commit `14e4e4510dd6a0978ad7fb3233994e2070bf8be1`.
 
 ## Goal
 
@@ -452,6 +453,21 @@ _(Codex fills this in as M1–M6 land.)_
   time coverage in the pure helpers plus `/today` integration, and
   synced the stale Verification step above. Commit: current review-fix
   head.
+
+- 2026-04-21 - fresh-context review returned `ship`. Head reviewed:
+  `14e4e4510dd6a0978ad7fb3233994e2070bf8be1`. No blocking, should-fix,
+  or nit findings. Reviewer confirmed: surface contract fidelity,
+  anti-pattern check, server-component discipline (only the approved
+  `ProjectListActive` client carveout), build shape (`/today` is `ƒ`,
+  other routes stay `○`), and the three review-point fixes
+  (local-day semantics, sidebar selected-state CSS, stale plan
+  verification step) are closed. Final verification at the reviewed
+  head: `typecheck` / `lint` green; `npm test` 20 files, 76 tests;
+  `npm run build` green.
+
+- 2026-04-21 - slice closed. Moved to
+  `docs/plans/archive/today-page-skeleton.md`. `docs/STATE.md` updated
+  to reflect the next active slice.
 
 ## Change Log
 
