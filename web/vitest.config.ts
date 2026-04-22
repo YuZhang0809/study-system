@@ -13,6 +13,7 @@ export default defineConfig({
       "tests/**/*.test.{ts,tsx}",
     ],
     includeSource: [
+      "lib/export/**/*.ts",
       "lib/schemas/**/*.ts",
       "lib/seed/**/*.ts",
       "lib/today/**/*.ts",
