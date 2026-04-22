@@ -61,7 +61,7 @@ export const RETRO_WIZARD_STEPS = [
   },
 ] as const;
 
-export const REFLECTION_REQUIRED_ERROR = "这一题不填,就写「没有」或「跳过」, 但别空着";
+export const REFLECTION_REQUIRED_ERROR = "这一题不填,就写『没有』或『跳过』,但别空着";
 export const REFLECTION_MAX_LENGTH_ERROR = "这一题最多 2000 字";
 export const SCORE_REQUIRED_ERROR = "这一项必填";
 export const SCORE_RANGE_ERROR = "分值必须在 1 到 5 之间";
