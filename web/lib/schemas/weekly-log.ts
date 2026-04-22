@@ -1,6 +1,15 @@
 import { z } from "zod";
+import {
+  WEEKLY_REFLECTION_MAX_LENGTH_ERROR,
+  WEEKLY_REFLECTION_REQUIRED_ERROR,
+  WEEKLY_SCORE_RANGE_ERROR,
+} from "../weekly-log/copy";
 
-const reflectionAnswer = z.string().trim().min(1).max(2000);
+const reflectionAnswer = z
+  .string()
+  .trim()
+  .min(1, WEEKLY_REFLECTION_REQUIRED_ERROR)
+  .max(2000, WEEKLY_REFLECTION_MAX_LENGTH_ERROR);
 
 export const weeklyLogReflections = z.object({
   q1: reflectionAnswer,
@@ -11,7 +20,10 @@ export const weeklyLogReflections = z.object({
   q6: reflectionAnswer,
 });
 
-export const weeklyLogSelfScores = z.record(z.string(), z.number().int().min(1).max(5));
+export const weeklyLogSelfScores = z.record(
+  z.string(),
+  z.number().int(WEEKLY_SCORE_RANGE_ERROR).min(1, WEEKLY_SCORE_RANGE_ERROR).max(5, WEEKLY_SCORE_RANGE_ERROR),
+);
 
 export const weeklyLogCreate = z.object({
   projectId: z.string().min(1),

@@ -1622,3 +1622,20 @@ button.check {
 .app-body::-webkit-scrollbar { width: 10px; height: 10px; }
 .app-body::-webkit-scrollbar-thumb { background: var(--paper-edge); border: 2px solid var(--paper); }
 .app-body::-webkit-scrollbar-track { background: transparent; }
+
+/* Progress bar — ledger tally */
+
+.tally {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 10px;
+}
+
+.tally .seg {
+  flex: 1;
+  background: var(--paper-3);
+  height: 100%;
+}
+
+.tally .seg.on { background: var(--ink); }
