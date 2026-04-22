@@ -109,6 +109,7 @@ model Retro {
   selfScores     Json
   threeQuestions Json
   scopeChanges   Json
+  nextPhaseFirstThing String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
