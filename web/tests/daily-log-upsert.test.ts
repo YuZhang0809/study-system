@@ -3,6 +3,15 @@ import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { PrismaClient } from "@prisma/client";
+import type { DailyLogRecord } from "../lib/daily-log/queries";
+import {
+  buildInitialStep1Entries,
+  buildInitialStep2Entries,
+  createStep1Entry,
+  getWhatDone,
+  getWhatSkipped,
+  toggleStep1Entry,
+} from "../lib/daily-log/wizard-state";
 import { createAppPrismaClient } from "../lib/prisma";
 import { upsertDailyLog } from "../lib/daily-log/actions";
 
@@ -163,6 +172,83 @@ describe("upsertDailyLog", () => {
     expect(log.whatDone).toEqual(["Parse yaml", "Investigate lock timing"]);
     expect(log.whatSkipped).toEqual(["Run integration test", "写完 retro plan"]);
     expect(log.timeSpentMinutes).toBe(175);
+  });
+
+  it("preserves stored skipped rows when rebuilding edit-mode wizard state from planned tasks", async () => {
+    const project = await seedProject("Wizard Edit Reconstruction Project");
+    const existingLog: DailyLogRecord = {
+      id: "existing-log",
+      projectId: project.id,
+      date: new Date("2026-05-05T00:00:00.000Z"),
+      whatDone: ["Parse yaml"],
+      whatSkipped: ["Run integration test", "写完 retro plan", "写完 retro plan"],
+      timeSpentMinutes: 120,
+      tomorrowFirstThing: "明早先跑 smoke",
+      honestyNote: null,
+      createdAt: new Date("2026-05-05T01:00:00.000Z"),
+      updatedAt: new Date("2026-05-05T01:00:00.000Z"),
+    };
+    const todayPlannedTasks = ["Parse yaml", "Run integration test", "Review findings"];
+
+    const step1Entries = buildInitialStep1Entries(todayPlannedTasks, existingLog);
+    const step2Entries = buildInitialStep2Entries(step1Entries, existingLog, "写完 retro plan");
+    const whatDone = getWhatDone(step1Entries);
+    const whatSkipped = getWhatSkipped(step1Entries, step2Entries);
+
+    expect(whatDone).toEqual(existingLog.whatDone);
+    expect(whatSkipped).toEqual(existingLog.whatSkipped);
+
+    await expect(
+      upsertDailyLog(
+        buildFormData({
+          projectId: project.id,
+          date: "2026-05-05",
+          whatDone,
+          whatSkipped,
+          timeSpentMinutes: "120",
+          tomorrowFirstThing: "明早先跑 smoke",
+          honestyNote: "",
+        }),
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    const log = await prisma.dailyLog.findFirstOrThrow({
+      where: { projectId: project.id },
+    });
+
+    expect(log.whatDone).toEqual(existingLog.whatDone);
+    expect(log.whatSkipped).toEqual(existingLog.whatSkipped);
+  });
+
+  it("serializes unchecked ad-hoc step-1 rows into whatSkipped", async () => {
+    const project = await seedProject("Wizard Adhoc Skipped Project");
+    const step1Entries = [toggleStep1Entry(createStep1Entry("Document wizard flow", true, "adhoc", true))];
+    const whatDone = getWhatDone(step1Entries);
+    const whatSkipped = getWhatSkipped(step1Entries, []);
+
+    expect(whatDone).toEqual([]);
+    expect(whatSkipped).toEqual(["Document wizard flow"]);
+
+    await expect(
+      upsertDailyLog(
+        buildFormData({
+          projectId: project.id,
+          date: "2026-05-05",
+          whatDone,
+          whatSkipped,
+          timeSpentMinutes: "45",
+          tomorrowFirstThing: "明早先补记录",
+          honestyNote: "",
+        }),
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    const log = await prisma.dailyLog.findFirstOrThrow({
+      where: { projectId: project.id },
+    });
+
+    expect(log.whatDone).toEqual([]);
+    expect(log.whatSkipped).toEqual(["Document wizard flow"]);
   });
 });
 

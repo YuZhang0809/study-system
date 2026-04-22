@@ -4,6 +4,18 @@ import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { Icon } from "@/components/shell/Icon";
 import { upsertDailyLog, type DailyLogActionResult } from "@/lib/daily-log/actions";
 import type { DailyLogRecord } from "@/lib/daily-log/queries";
+import {
+  buildInitialStep1Entries,
+  buildInitialStep2Entries,
+  createStep1Entry,
+  createStep2Entry,
+  getWhatDone,
+  getWhatSkipped,
+  normalizeText,
+  toggleStep1Entry,
+  type Step1Entry,
+  type Step2Entry,
+} from "@/lib/daily-log/wizard-state";
 import { formatIsoDate } from "@/lib/today/driving-seat";
 import { Step1Checklist } from "./wizard/Step1Checklist";
 import { Step2SkippedList } from "./wizard/Step2SkippedList";
@@ -18,18 +30,6 @@ interface EndOfDayWizardProps {
   todayPlannedTasks: string[];
   yesterdayPromiseText: string | null;
   onClose: () => void;
-}
-
-interface Step1Entry {
-  id: string;
-  text: string;
-  checked: boolean;
-  origin: "plan" | "adhoc";
-}
-
-interface Step2Entry {
-  id: string;
-  text: string;
 }
 
 type FieldErrors = NonNullable<DailyLogActionResult["fieldErrors"]>;
@@ -61,127 +61,6 @@ const STEPS = [
   },
 ] as const;
 
-let wizardRowCounter = 0;
-
-function createWizardId(prefix: string): string {
-  wizardRowCounter += 1;
-  return `${prefix}-${wizardRowCounter}`;
-}
-
-function normalizeText(value: string | null | undefined): string {
-  return value?.trim() ?? "";
-}
-
-function incrementCount(counts: Map<string, number>, key: string) {
-  counts.set(key, (counts.get(key) ?? 0) + 1);
-}
-
-function consumeCount(counts: Map<string, number>, key: string): boolean {
-  const current = counts.get(key) ?? 0;
-
-  if (current <= 0) {
-    return false;
-  }
-
-  if (current === 1) {
-    counts.delete(key);
-    return true;
-  }
-
-  counts.set(key, current - 1);
-  return true;
-}
-
-function createStep1Entry(text: string, checked: boolean, origin: Step1Entry["origin"]): Step1Entry {
-  return {
-    id: createWizardId(origin),
-    text,
-    checked,
-    origin,
-  };
-}
-
-function createStep2Entry(text: string): Step2Entry {
-  return {
-    id: createWizardId("skipped"),
-    text,
-  };
-}
-
-function buildInitialStep1Entries(todayPlannedTasks: string[], existingLog: DailyLogRecord | null): Step1Entry[] {
-  const plannedTexts = todayPlannedTasks.map(normalizeText).filter(Boolean);
-
-  if (!existingLog) {
-    return plannedTexts.map((text) => createStep1Entry(text, false, "plan"));
-  }
-
-  const doneTexts = existingLog.whatDone.map(normalizeText).filter(Boolean);
-  const remainingDoneCounts = new Map<string, number>();
-
-  for (const text of doneTexts) {
-    incrementCount(remainingDoneCounts, text);
-  }
-
-  const step1Entries = plannedTexts.map((text) => {
-    const checked = consumeCount(remainingDoneCounts, text);
-    return createStep1Entry(text, checked, "plan");
-  });
-
-  for (const text of doneTexts) {
-    if (consumeCount(remainingDoneCounts, text)) {
-      step1Entries.push(createStep1Entry(text, true, "adhoc"));
-    }
-  }
-
-  return step1Entries;
-}
-
-function buildInitialStep2Entries(
-  step1Entries: Step1Entry[],
-  existingLog: DailyLogRecord | null,
-  yesterdayPromiseText: string | null,
-): Step2Entry[] {
-  const initialText = normalizeText(yesterdayPromiseText);
-  const step2Entries = initialText ? [createStep2Entry(initialText)] : [];
-  const seenTexts = initialText ? new Set([initialText]) : new Set<string>();
-
-  if (!existingLog) {
-    return step2Entries;
-  }
-
-  const representedPlannedSkips = new Map<string, number>();
-
-  // Edit-mode reconstruction is intentionally lossy: planned rows stay in step 1,
-  // while only skipped items not already represented by an unchecked plan row reopen in step 2.
-  // Yesterday's promise still anchors the first skipped row even when editing an existing log.
-  for (const entry of step1Entries) {
-    if (entry.origin === "plan" && !entry.checked) {
-      incrementCount(representedPlannedSkips, entry.text);
-    }
-  }
-
-  for (const rawText of existingLog.whatSkipped) {
-    const text = normalizeText(rawText);
-
-    if (!text) {
-      continue;
-    }
-
-    if (consumeCount(representedPlannedSkips, text)) {
-      continue;
-    }
-
-    if (seenTexts.has(text)) {
-      continue;
-    }
-
-    seenTexts.add(text);
-    step2Entries.push(createStep2Entry(text));
-  }
-
-  return step2Entries;
-}
-
 function commitDraftEntry(entries: Step1Entry[], draftValue: string): { entries: Step1Entry[]; draftValue: string } {
   const text = normalizeText(draftValue);
 
@@ -193,29 +72,9 @@ function commitDraftEntry(entries: Step1Entry[], draftValue: string): { entries:
   }
 
   return {
-    entries: [...entries, createStep1Entry(text, true, "adhoc")],
+    entries: [...entries, createStep1Entry(text, true, "adhoc", true)],
     draftValue: "",
   };
-}
-
-function getWhatDone(entries: Step1Entry[]): string[] {
-  return entries.flatMap((entry) => {
-    const text = normalizeText(entry.text);
-    return entry.checked && text ? [text] : [];
-  });
-}
-
-function getWhatSkipped(step1Entries: Step1Entry[], step2Entries: Step2Entry[]): string[] {
-  return [
-    ...step1Entries.flatMap((entry) => {
-      const text = normalizeText(entry.text);
-      return !entry.checked && text ? [text] : [];
-    }),
-    ...step2Entries.flatMap((entry) => {
-      const text = normalizeText(entry.text);
-      return text ? [text] : [];
-    }),
-  ];
 }
 
 function hasMeaningfulStep2Entries(entries: Step2Entry[]): boolean {
@@ -445,14 +304,7 @@ export function EndOfDayWizard({
               onToggle={(id) => {
                 clearMessages();
                 setStep1Entries((current) =>
-                  current.map((entry) =>
-                    entry.id === id
-                      ? {
-                          ...entry,
-                          checked: !entry.checked,
-                        }
-                      : entry,
-                  ),
+                  current.map((entry) => (entry.id === id ? toggleStep1Entry(entry) : entry)),
                 );
               }}
               doneError={whatDoneError}
