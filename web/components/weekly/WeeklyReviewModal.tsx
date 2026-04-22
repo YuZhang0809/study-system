@@ -13,6 +13,7 @@ import {
   type WeeklyQuestionKey,
   type WeeklyScoreKey,
 } from "@/lib/weekly-log/copy";
+import { resizeTextarea } from "@/lib/ui/resize-textarea";
 import type { WeeklyLogReflectionsInput, WeeklyLogSelfScoresInput } from "@/lib/schemas/weekly-log";
 import { formatIsoDate } from "@/lib/today/driving-seat";
 import { WeeklyScoresRow } from "./WeeklyScoresRow";
@@ -259,6 +260,7 @@ export function WeeklyReviewModal({
                   labelId={`weekly-score-${key}`}
                   value={scores[key]}
                   error={scoreErrors[key] ?? null}
+                  referenceLine={undefined}
                   onChange={(value) => handleScoreChange(key, value)}
                   firstButtonRef={(node) => {
                     scoreButtonRefs.current[key] = node;
@@ -294,11 +296,6 @@ export function WeeklyReviewModal({
 
 function getInitialScore(value: number | undefined): number | null {
   return typeof value === "number" && value >= 1 && value <= 5 ? value : null;
-}
-
-function resizeTextarea(textarea: HTMLTextAreaElement) {
-  textarea.style.height = "0px";
-  textarea.style.height = `${Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
 }
 
 function mapReflectionErrors(result: Extract<WeeklyLogActionResult, { ok: false }>): ReflectionErrors {

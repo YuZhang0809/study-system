@@ -2,13 +2,14 @@
 
 import { useRef } from "react";
 
-interface WeeklyScoresRowProps {
+export interface WeeklyScoresRowProps {
   label: string;
   labelId: string;
   value: number | null;
   error: string | null;
   onChange: (value: number) => void;
   firstButtonRef?: (node: HTMLButtonElement | null) => void;
+  referenceLine?: string;
 }
 
 export function WeeklyScoresRow({
@@ -18,6 +19,7 @@ export function WeeklyScoresRow({
   error,
   onChange,
   firstButtonRef,
+  referenceLine,
 }: WeeklyScoresRowProps) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -42,6 +44,11 @@ export function WeeklyScoresRow({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {referenceLine ? (
+        <p className="mono t-xs ink-3" style={{ margin: 0 }}>
+          {referenceLine}
+        </p>
+      ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 24px", gap: 10, alignItems: "center" }}>
         <span id={labelId} className="mono t-xs caps ink-3">
           {label}
