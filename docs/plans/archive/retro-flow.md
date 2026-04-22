@@ -1,13 +1,95 @@
 # ExecPlan — retro-flow
 
-**Status:** active
+**Status:** closed
 **Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-22
-**Target close:** 2026-04-26 — one working session of implementation
-plus a fresh-context review pass, mirroring the `weekly-review-flow`
-cadence. `export-json-cli` is the final v1 slice before the 2026-05-03
-dogfood deadline, so this one has to land cleanly.
+**Closed:** 2026-04-22
+**Target close:** 2026-04-26 — **actually closed 2026-04-22**, same
+day as drafting, after M1–M5 + review-block follow-up landed within
+one working session.
+
+## Outcome
+
+Shipped. `/retros` now hosts the live phase-retro surface:
+
+- Default tab flipped from `weekly` back to `phase` per design.
+- Page-head `阶段复盘 ⌘↵` primary button is driven by
+  eligible-segment selection (most-recent finished segment not yet
+  retro'd); disabled variants carry the locked tooltip copy.
+- In-page 5-step wizard (`指标 / 六项自评 / 三问 / 范围调整 / 留钩子`)
+  writes one `Retro` per `segmentId` through `upsertRetro`.
+  Open/close is URL-driven via `?wizard=1`; page stays a server
+  component, wizard form state stays client-only.
+- Committed retros render as read-only cards with
+  `第 N 阶段 — {name}` header, the 7-metric strip with drift-percent
+  tag, 6 ink-tally score rows, fixed 三问 Q/A blocks, scope-change
+  list (zero rows renders `(无)`), and `nextPhaseFirstThing`.
+- Step-2 shows muted `上阶段 {label} · {value}` reference lines
+  above each row when a previous retro exists. Never pre-fills.
+- Step-5 hint about "钉在下一阶段第 1 天的今日页" renders truthfully:
+  `nextPhaseFirstThing` is stored; the actual `/today` pin wiring
+  is intentionally parked for a later Today polish slice.
+- Schema risk kept to the locked additive migration only:
+  `add-retro-next-phase-first-thing` adds one nullable column.
+  Migration was committed via `prisma migrate diff` after `prisma
+  migrate dev` reported drift against the local dev DB — see the
+  runtime-DB note below.
+- All four anti-patterns still pass.
+
+Fresh-context review verdict: **`approve`** after three follow-up
+commits cleared the initial block:
+
+1. `PhaseRetroEntry.tsx` hard-reload via `window.location.href` was
+   replaced with `router.replace(listHref, { scroll: false })`
+   (commit `fb2e98d`).
+2. Stale retro JSON shapes `{kept,changed,killed}` and `{from,to}`
+   in `schema-roundtrip.test.ts` and `seed-cli.test.ts` were
+   replaced with the design-authoritative `{q1,q2,q3}` /
+   `{change,reason}` shapes (commit `b2bdb9f`).
+3. `web/vitest.config.ts` exclusion of `lib/retro/**/*.ts` was
+   removed so the in-source `presentation.ts` / `metrics.ts`
+   helper tests are actually collected (commit `d07ec1d`).
+
+Plan progress log was populated and worktree cleanup landed in
+commit `9a52828` (approved review head).
+
+### Final verification
+
+At head `9a52828`:
+
+- `cd web && npm run build` — green
+- `cd web && npm run typecheck` — green
+- `cd web && npm run lint` — green
+- `cd web && npm test` — green; 140/140 tests (+21 from the
+  `weekly-review-flow` 119 baseline)
+- `cd web && npx prisma migrate diff --from-migrations
+  prisma/migrations --to-schema prisma/schema.prisma --script
+  --exit-code` — empty diff (schema in sync with migrations)
+- `git status` — clean
+- repo grep — no remaining `{kept,changed,killed}` or `{from,to}`
+  retro fixtures
+- Seven-step manual smoke covered eligible-segment default,
+  submit-validation bounce to step 2, commit + card render,
+  previous-phase reference line without prefill, cross-project
+  rerendering, and the weekly/phase tab flip.
+
+### Post-close note: local runtime DB drift
+
+After review approval, Codex discovered that the local
+`web/prisma/dev.db` has never had `_prisma_migrations` populated —
+no prior slice's migration has actually been applied to this DB.
+The existing rows (10 projects / 29 segments / 47 plan days / 3
+daily logs) were created via an earlier `prisma db push` or direct
+write. retro-flow is merely the first slice whose new column is
+queried by default page render, so it is the first slice whose
+runtime drift manifests as a P2022 page error.
+
+This is NOT a retro-flow defect. The codebase diff is clean and
+approved. The local-environment repair is tracked as a separate
+chore; see `docs/STATE.md` `Blockers` section and decision
+`docs/decisions/0002-schema-slice-runtime-probe.md` for the
+verifier-process gap this exposed.
 
 ## Goal
 

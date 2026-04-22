@@ -4,33 +4,55 @@ Last updated: 2026-04-22
 
 ## Current Phase
 
-**`retro-flow` implementation is complete (2026-04-22);
-fresh-context review is pending.**
+**`retro-flow` code slice is closed (2026-04-22) at approved head
+`9a52828`. The orthogonal local-runtime-DB repair chore ran
+2026-04-22 via drop + rebuild (Option B); `/retros`, `/retros?tab=weekly`,
+and `/today` all return 200 with no Prisma error against the real
+`DATABASE_URL`. `export-json-cli` — the final v1 slice — is now
+unblocked and awaiting scoping.**
 
-`/retros` now matches the locked phase-retro slice shape: the
-default tab is back on `phase`, the phase surface is live rather
-than a placeholder, the page-head `阶段复盘 ⌘↵` entry is driven by
-eligible-segment selection, and the in-page 5-step wizard
-(`指标 / 六项自评 / 三问 / 范围调整 / 留钩子`) writes one retro per
-segment through a server action with URL-driven open/close
-(`?wizard=1`). Committed retros render as read-only cards with the
-7-metric strip, 6-score tally rows, fixed 三问 copy, scope-change
-list, and `nextPhaseFirstThing`.
+Fresh-context review at `9a52828` returned `approve` after three
+follow-up commits cleared an initial block: `PhaseRetroEntry.tsx`
+now uses `router.replace` instead of `window.location.href`
+(`fb2e98d`), `schema-roundtrip.test.ts` / `seed-cli.test.ts` retro
+fixtures were updated to the design-authoritative
+`{q1,q2,q3}` / `{change,reason}` shapes (`b2bdb9f`), and
+`web/vitest.config.ts` no longer excludes `lib/retro/**/*.ts` so
+the in-source `presentation.ts` / `metrics.ts` helper tests
+actually run (`d07ec1d`). Plan progress log + worktree cleanup
+landed in `9a52828`. Verification at close: 140/140 tests green,
+build / typecheck / lint green, `prisma migrate diff` empty
+against the committed schema, git status clean, seven-step manual
+smoke green on a temp-migrated DB, and repo grep confirmed no
+remaining `{kept,changed,killed}` or `{from,to}` retro fixtures.
 
-Schema risk was kept to the locked additive migration only:
-`add-retro-next-phase-first-thing` adds one nullable
-`Retro.nextPhaseFirstThing` column, while the retro JSON payloads
-were narrowed at the Zod boundary to the design-authoritative
-shape. Metrics remain pure Prisma aggregation (`drift_days` =
-planned-dates minus logged-dates over the segment window), the
-previous-phase score reference renders as muted copy rather than
-prefill, and the four anti-patterns still pass: not a tutor, not a
-ghostwriter, not a cheerleader, not a planner.
+**The runtime-DB chore was orthogonal to the retro-flow code
+diff.** After review approval, Codex discovered that
+`web/prisma/dev.db` had never had `_prisma_migrations` populated
+— no prior slice's migration had actually been applied to that DB.
+Its existing rows were created via an earlier `prisma db push` or
+direct write. `retro-flow` was simply the first slice whose new
+column is queried by a default page render, so it was the first
+slice where the runtime drift manifested as a user-visible error
+(P2022 on opening `/retros` against the real DATABASE_URL). Prior
+slices had the same gap silently. See
+`docs/decisions/0002-schema-slice-runtime-probe.md` for the
+verifier-process fix that prevents a repeat.
+
+The chore ran 2026-04-22 via Option B (drop + rebuild): the
+pre-drop DB was dumped to `web/prisma/backups/dev.db.20260422-194951.sql`
+(gitignored), `dev.db` was removed, and `npx prisma migrate
+deploy` reapplied all four committed migrations from scratch
+against an empty DB. No seed: no canonical prod yaml exists — the
+Agentic 90-day yaml for dogfood is authored separately. Only
+in-repo change from the chore: `web/.gitignore` gained
+`prisma/backups/`. The runtime-probe rule from decision 0002 ran
+for the first time here and passed.
 
 The dogfood deadline is still **2026-05-03**. With
 `daily-log-flow`, `weekly-review-flow`, and `retro-flow`
-implemented, `export-json-cli` is the final v1 slice after the
-retro review closes.
+implemented and the local runtime baseline clean, `export-json-cli`
+is the final v1 slice before dogfood and is ready to scope.
 
 ## What Is True Now
 
@@ -41,9 +63,11 @@ retro review closes.
 - `docs/decisions/0001-design-handoff-reference.md` still locks the visual system
 - `docs/plans/archive/` holds the closed `scaffold-and-schema`,
   `seed-cli`, `today-page-skeleton`, `knowledge-capture-inline`,
-  `daily-log-flow`, and `weekly-review-flow` plans
-- `docs/plans/retro-flow.md` is the current slice record; the
-  implementation is landed and waiting on fresh-context review
+  `daily-log-flow`, `weekly-review-flow`, and `retro-flow` plans
+- `docs/decisions/0002-schema-slice-runtime-probe.md` adds two
+  verifier steps (`prisma migrate status` + runtime probe against
+  real DATABASE_URL) required for any schema-changing slice before
+  review handoff
 - `web/lib/knowledge/` now holds the knowledge slice server/data layer:
   `queries.ts`, `slug.ts`, `artifact-kind.ts`, and `actions.ts`
 - `web/components/knowledge/` now holds the knowledge slice UI
@@ -146,21 +170,38 @@ Unchanged from the prior state:
 
 ## Verification Snapshot
 
-As of 2026-04-22 at `retro-flow` implementation close (pre
-fresh-context review):
+As of 2026-04-22 at `retro-flow` close (fresh-context review
+returned `approve` at head `9a52828`):
 
 - `cd web && npm run build` - green; `/knowledge`, `/retros`, and
   `/today` build as dynamic routes, while `/`, `/_not-found`,
   `/artifacts`, `/plan`, and `/settings` remain static
 - `cd web && npm run typecheck` - green
 - `cd web && npm run lint` - green
-- `cd web && npm test` - green; 133/133 tests
-- Manual smoke on a `next start` preview during implementation
-  covered all seven retro-flow plan items: phase-default eligible
-  state, submit validation bounce to step 2, current-segment create,
-  committed-card render, previous-phase score reference line without
-  prefill, cross-project rerendering on `/retros`, and the weekly-tab
-  surface staying intact after the phase-default flip.
+- `cd web && npm test` - green; 140/140 tests (the previously
+  excluded in-source tests for `web/lib/retro/presentation.ts` and
+  `web/lib/retro/metrics.ts` now run after `vitest.config.ts` was
+  un-excluded in `d07ec1d`)
+- `npx prisma migrate diff --from-migrations prisma/migrations
+  --to-schema prisma/schema.prisma --script --exit-code` — empty
+- `git status` — clean
+- Seven-step manual smoke green against a temp-migrated DB during
+  the review pass: phase-default eligible state, submit validation
+  bounce to step 2, current-segment create, committed-card render,
+  previous-phase score reference line without prefill, cross-project
+  rerendering on `/retros`, and the weekly-tab surface staying intact
+  after the phase-default flip.
+
+**Real-runtime baseline (added 2026-04-22 post-chore):**
+
+- `npx prisma migrate status` against the real `DATABASE_URL` —
+  "Database schema is up to date!" with all four committed
+  migrations applied
+- `npx prisma migrate diff --from-config-datasource --to-schema
+  prisma/schema.prisma` — "No difference detected"
+- `next start` + HTTP probe: `/retros` → 200, `/retros?tab=weekly`
+  → 200, `/today` → 200; server stdout/stderr clean of
+  P2022 / Prisma / Error / Unhandled / Exception
 
 ## Known Open Questions
 
@@ -174,17 +215,20 @@ fresh-context review):
   generated-types artifact, not a product defect. Verifier order is
   `build → typecheck` (or prepend `next typegen`). Revisit if any
   slice's verification step trips on it.
+- Prisma 7 renamed `migrate diff`'s `--from-schema-datasource`
+  to `--from-config-datasource`. The chore surfaced this; decision
+  0002's Open items note it. Any future verifier template that
+  diffs schema against the real datasource must use the new flag.
 
 ## Recommended Next Step
 
-**Open the fresh-context review for `retro-flow`.** Implementation is
-landed and verified; the next useful step is a diff-focused Codex
-review against `main` using `docs/code_review.md`, with emphasis on
-the retro schema boundary, metrics aggregation, and the phase-wizard
-write path.
-
-After the retro review closes: `export-json-cli` is the final v1
-slice before the 2026-05-03 dogfood deadline.
+**Scope `export-json-cli`.** `retro-flow` is closed at `9a52828`;
+the local-DB chore is done; the real runtime boots clean. This is
+the final v1 slice before the 2026-05-03 dogfood deadline.
+`export-json-cli` does not add a Prisma migration, so decision
+0002's two extra verifier lines don't apply to it; it will,
+however, be the first slice whose handoff template gets reviewed
+against decision 0002's reviewer-check rule (rule 4).
 
 ## Blockers
 
@@ -192,7 +236,6 @@ None.
 
 ## Deferred / Upcoming
 
-- `retro-flow` — implemented; fresh-context review pending
 - `export-json-cli` — final v1 slice before dogfood
 - v2-only AI roles (Coach / Historian / Scout / Principle mirror)
 - multi-user, cloud sync, mobile, and collaboration remain out of scope
