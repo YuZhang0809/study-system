@@ -577,10 +577,30 @@ async function insertUserRows(): Promise<void> {
   await prisma.retro.create({
     data: {
       segmentId: firstSegment.id,
-      metrics: { logs: 1 },
-      selfScores: { focus: 3 },
-      threeQuestions: { kept: "x", changed: "y", killed: "z" },
-      scopeChanges: [{ from: "old", to: "new" }],
+      metrics: {
+        commits: 0,
+        logs: 1,
+        learnings: 0,
+        bugs: 0,
+        prompts: 0,
+        planned_days: 2,
+        drift_days: 1,
+      },
+      selfScores: {
+        clarity: 3,
+        honesty: 4,
+        output: 3,
+        depth: 4,
+        discipline: 3,
+        energy: 2,
+      },
+      threeQuestions: {
+        q1: "真正搞懂了 seed 只写计划表。",
+        q2: "当时骗自己搞懂了 blast radius。",
+        q3: "重来会先砍掉手工回填。",
+      },
+      scopeChanges: [{ change: "收窄 yaml 范围", reason: "减少漂移" }],
+      nextPhaseFirstThing: "先 rerun idempotently",
     },
   });
 

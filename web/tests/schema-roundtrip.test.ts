@@ -104,13 +104,38 @@ describe("schema round-trip", () => {
     const retro = await prisma.retro.create({
       data: {
         segmentId: segment.id,
-        metrics: { daysLogged: 10 },
-        selfScores: { overall: 3 },
-        threeQuestions: { kept: "x", changed: "y", killed: "z" },
-        scopeChanges: [{ from: "A", to: "B" }],
+        metrics: {
+          commits: 2,
+          logs: 10,
+          learnings: 3,
+          bugs: 1,
+          prompts: 4,
+          planned_days: 12,
+          drift_days: 2,
+        },
+        selfScores: {
+          clarity: 3,
+          honesty: 4,
+          output: 3,
+          depth: 4,
+          discipline: 3,
+          energy: 2,
+        },
+        threeQuestions: {
+          q1: "真正搞懂了怎么把切片压到最小。",
+          q2: "当时骗自己搞懂了异步边界。",
+          q3: "重来会先砍掉环境折腾。",
+        },
+        scopeChanges: [{ change: "砍掉旧方案", reason: "ROI 太低" }],
+        nextPhaseFirstThing: "先跑 smoke",
       },
     });
     expect(retro.segmentId).toBe(segment.id);
+    expect(retro.threeQuestions).toMatchObject({
+      q1: "真正搞懂了怎么把切片压到最小。",
+      q3: "重来会先砍掉环境折腾。",
+    });
+    expect(retro.scopeChanges).toEqual([{ change: "砍掉旧方案", reason: "ROI 太低" }]);
 
     const knowledge = await prisma.knowledgeItem.create({
       data: {
