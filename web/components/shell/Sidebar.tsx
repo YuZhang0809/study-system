@@ -55,9 +55,9 @@ function ProjectListFallback({
     <ul className="proj-list">
       {projects.map((project) => (
         <li key={project.id}>
-          <a href={`/today?project=${project.id}`} className="proj-item">
+          <span className="proj-item">
             <span className="proj-name">{project.name}</span>
-          </a>
+          </span>
         </li>
       ))}
     </ul>

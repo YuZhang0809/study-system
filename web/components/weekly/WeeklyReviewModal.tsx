@@ -214,9 +214,6 @@ export function WeeklyReviewModal({
               {formatIsoDate(weekStart)} → {formatIsoDate(weekEnd)}
             </h2>
           </div>
-          <button type="button" className="btn btn--ghost wizard-close" onClick={onClose}>
-            取消
-          </button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24 }}>
