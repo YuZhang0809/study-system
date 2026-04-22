@@ -124,7 +124,6 @@ export default async function RetrosPage({ searchParams }: RetrosPageProps) {
 
       {activeTab === "phase" ? (
         <PhaseRetroEntry
-          projectId={project.id}
           eligibleSegment={eligibleSegment}
           eligibleReason={eligibleReason}
           metrics={metrics}

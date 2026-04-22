@@ -31,7 +31,6 @@ import type { RetroSegmentLike } from "@/lib/retro/presentation";
 import { RetroScoresRow } from "./RetroScoresRow";
 
 interface PhaseRetroWizardProps {
-  projectId: string;
   segment: RetroSegmentLike;
   metrics: RetroMetricsInput;
   previousScores: RetroSelfScoresInput | null;
@@ -48,7 +47,6 @@ type ScopeErrors = Array<Partial<Record<keyof RetroScopeChangeInput, string>> | 
 const MAX_TEXTAREA_HEIGHT = 192;
 
 export function PhaseRetroWizard({
-  projectId,
   segment,
   metrics,
   previousScores,

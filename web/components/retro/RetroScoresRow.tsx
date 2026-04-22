@@ -2,7 +2,7 @@
 
 import { WeeklyScoresRow, type WeeklyScoresRowProps } from "@/components/weekly/WeeklyScoresRow";
 
-export interface RetroScoresRowProps extends WeeklyScoresRowProps {}
+export type RetroScoresRowProps = WeeklyScoresRowProps;
 
 export function RetroScoresRow(props: RetroScoresRowProps) {
   return <WeeklyScoresRow {...props} />;

@@ -7,7 +7,6 @@ import type { RetroEligibilityReason, RetroSegmentLike } from "@/lib/retro/prese
 import type { RetroRecord } from "@/lib/retro/queries";
 
 interface PhaseRetroEntryProps {
-  projectId: string;
   eligibleSegment: RetroSegmentLike | null;
   eligibleReason: RetroEligibilityReason | null;
   metrics: RetroMetricsInput | null;
@@ -18,7 +17,6 @@ interface PhaseRetroEntryProps {
 }
 
 export function PhaseRetroEntry({
-  projectId,
   eligibleSegment,
   eligibleReason,
   metrics,
@@ -30,7 +28,6 @@ export function PhaseRetroEntry({
   if (isWizardOpen && eligibleSegment && metrics) {
     return (
       <PhaseRetroWizard
-        projectId={projectId}
         segment={eligibleSegment}
         metrics={metrics}
         previousScores={previousScores}

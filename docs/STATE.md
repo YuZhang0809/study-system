@@ -4,26 +4,33 @@ Last updated: 2026-04-22
 
 ## Current Phase
 
-**`weekly-review-flow` implementation is complete (2026-04-22);
+**`retro-flow` implementation is complete (2026-04-22);
 fresh-context review is pending.**
 
-The `/retros` placeholder has been replaced with the live weekly-review
-surface: page-head `本周复盘 ⌘↵` / `修改本周 ⌘↵`, `阶段复盘` placeholder
-tab, weekly modal write path, read-only weekly card list, previous-week
-Q6 reference line for Q4, and server-side weekly upsert/revalidation.
-All four anti-patterns still pass. Verification at close: `build`,
-`typecheck`, `lint`, and `test` are green; `/retros` now builds as a
-dynamic route; a `next start` preview against a temp SQLite DB covered
-all six weekly-review smoke items.
+`/retros` now matches the locked phase-retro slice shape: the
+default tab is back on `phase`, the phase surface is live rather
+than a placeholder, the page-head `阶段复盘 ⌘↵` entry is driven by
+eligible-segment selection, and the in-page 5-step wizard
+(`指标 / 六项自评 / 三问 / 范围调整 / 留钩子`) writes one retro per
+segment through a server action with URL-driven open/close
+(`?wizard=1`). Committed retros render as read-only cards with the
+7-metric strip, 6-score tally rows, fixed 三问 copy, scope-change
+list, and `nextPhaseFirstThing`.
 
-The preceding `knowledge-capture-inline` slice remains in place:
-`/knowledge` stays the primary inline capture surface for
-`knowledge_item`, and `/today`'s `最近动静` block still renders the
-active project's top-5 recent captures.
+Schema risk was kept to the locked additive migration only:
+`add-retro-next-phase-first-thing` adds one nullable
+`Retro.nextPhaseFirstThing` column, while the retro JSON payloads
+were narrowed at the Zod boundary to the design-authoritative
+shape. Metrics remain pure Prisma aggregation (`drift_days` =
+planned-dates minus logged-dates over the segment window), the
+previous-phase score reference renders as muted copy rather than
+prefill, and the four anti-patterns still pass: not a tutor, not a
+ghostwriter, not a cheerleader, not a planner.
 
 The dogfood deadline is still **2026-05-03**. With
-`daily-log-flow` implemented, the remaining v1 slices are
-`weekly-review-flow`, `retro-flow`, and `export-json-cli`.
+`daily-log-flow`, `weekly-review-flow`, and `retro-flow`
+implemented, `export-json-cli` is the final v1 slice after the
+retro review closes.
 
 ## What Is True Now
 
@@ -33,11 +40,10 @@ The dogfood deadline is still **2026-05-03**. With
 - `AGENTS.md` + `web/AGENTS.md` remain the operating contract and command map
 - `docs/decisions/0001-design-handoff-reference.md` still locks the visual system
 - `docs/plans/archive/` holds the closed `scaffold-and-schema`,
-  `seed-cli`, `today-page-skeleton`, `knowledge-capture-inline`, and
-  `daily-log-flow` plans
-- `docs/plans/weekly-review-flow.md` remains the current execution
-  record and now carries the M1–M4 progress log entries plus the
-  M5 handoff note
+  `seed-cli`, `today-page-skeleton`, `knowledge-capture-inline`,
+  `daily-log-flow`, and `weekly-review-flow` plans
+- `docs/plans/retro-flow.md` is the current slice record; the
+  implementation is landed and waiting on fresh-context review
 - `web/lib/knowledge/` now holds the knowledge slice server/data layer:
   `queries.ts`, `slug.ts`, `artifact-kind.ts`, and `actions.ts`
 - `web/components/knowledge/` now holds the knowledge slice UI
@@ -65,11 +71,24 @@ The dogfood deadline is still **2026-05-03**. With
   `未清账`, and `阻塞` project-scoped
 - `web/lib/weekly-log/` now holds the weekly slice data/presentation
   layer: `presentation.ts`, `queries.ts`, `actions.ts`, and `copy.ts`
+- `web/lib/retro/` now holds the retro slice data/presentation layer:
+  `copy.ts`, `presentation.ts`, `metrics.ts`, `queries.ts`, and
+  `actions.ts`
+- `web/lib/ui/resize-textarea.ts` now holds the shared textarea auto-grow
+  helper reused by both weekly and retro flows
 - `web/components/weekly/` now holds the weekly slice UI primitives:
   `WeeklyReviewEntry`, `WeeklyReviewModal`, `WeeklyScoresRow`, and the
   server-safe `WeeklyLogCard`
-- `web/app/retros/page.tsx` now replaces the placeholder with the live
-  weekly tab plus the phase-placeholder tab
+- `web/components/retro/` now holds the retro slice UI primitives:
+  `PhaseRetroEntry`, `PhaseRetroList`, `PhaseRetroCard`,
+  `PhaseRetroWizard`, and `RetroScoresRow`
+- `web/app/retros/page.tsx` now ships the live dual-surface `/retros`
+  page: default `phase` tab, URL-driven phase wizard, real
+  eligible-segment state, and the preserved weekly tab flow
+- `web/lib/schemas/retro.ts` now matches the design-authoritative
+  retro payload shape (`threeQuestions.q1..q3`,
+  `scopeChanges[{change,reason}]`, fixed 7 metrics, fixed 6 scores,
+  required `nextPhaseFirstThing`)
 - `web/lib/schemas/weekly-log.ts` now enforces trimmed required
   `reflections.q1..q6` answers with neutral Chinese validation copy
 - `web/components/shell/ProjectListActive.tsx` now preserves the current
@@ -89,9 +108,15 @@ The dogfood deadline is still **2026-05-03**. With
   actions against temp SQLite DBs
 - `web/tests/weekly-log-upsert.test.ts` covers weekly upsert behavior
   and validation against a temp SQLite DB
-- `web/tests/retros-page.test.tsx` renders `/retros` through RTL and
-  covers empty states, current/previous-week button state, and the
-  phase placeholder
+- `web/tests/retro-upsert.test.ts` covers retro upsert behavior and
+  validation against a temp SQLite DB
+- `web/tests/retro-metrics.test.ts` covers the 7 retro metrics,
+  including `drift_days` math and commit-artifact filtering, against a
+  temp SQLite DB
+- `web/tests/retros-page.test.tsx` now renders `/retros` through RTL
+  with both weekly and phase coverage: phase-default empty state,
+  eligible-segment caption, committed retro card render, and
+  `?wizard=1` in-page wizard mode
 - `web/tests/today-page.test.tsx` now covers the page-head `今日收工`
   button, the read-only `昨日之承诺` block, and the surviving
   `未清账` / `阻塞` states in addition to the earlier Today-shell
@@ -121,20 +146,21 @@ Unchanged from the prior state:
 
 ## Verification Snapshot
 
-As of 2026-04-22 at `weekly-review-flow` close (author verification,
-pre fresh-context review):
+As of 2026-04-22 at `retro-flow` implementation close (pre
+fresh-context review):
 
 - `cd web && npm run build` - green; `/knowledge`, `/retros`, and
   `/today` build as dynamic routes, while `/`, `/_not-found`,
   `/artifacts`, `/plan`, and `/settings` remain static
 - `cd web && npm run typecheck` - green
 - `cd web && npm run lint` - green
-- `cd web && npm test` - green; 119 tests
-- Manual smoke on a `next start` preview against
-  `web/prisma/manual-smoke-weekly-flow.db` covered all six weekly-review
-  items: weekly-tab empty state, submit validation, current-week create,
-  current-week edit, previous-week Q6 reference line, phase placeholder,
-  and cross-project rerendering on `/retros`
+- `cd web && npm test` - green; 133/133 tests
+- Manual smoke on a `next start` preview during implementation
+  covered all seven retro-flow plan items: phase-default eligible
+  state, submit validation bounce to step 2, current-segment create,
+  committed-card render, previous-phase score reference line without
+  prefill, cross-project rerendering on `/retros`, and the weekly-tab
+  surface staying intact after the phase-default flip.
 
 ## Known Open Questions
 
@@ -151,12 +177,14 @@ pre fresh-context review):
 
 ## Recommended Next Step
 
-**Open the fresh-context review for `weekly-review-flow`.** Implementation
-is landed and verified; the next useful step is a diff-focused Codex
-review against `main` using `docs/code_review.md`.
+**Open the fresh-context review for `retro-flow`.** Implementation is
+landed and verified; the next useful step is a diff-focused Codex
+review against `main` using `docs/code_review.md`, with emphasis on
+the retro schema boundary, metrics aggregation, and the phase-wizard
+write path.
 
-After that: `retro-flow`, then `export-json-cli` before the
-2026-05-03 dogfood deadline.
+After the retro review closes: `export-json-cli` is the final v1
+slice before the 2026-05-03 dogfood deadline.
 
 ## Blockers
 
@@ -164,8 +192,7 @@ None.
 
 ## Deferred / Upcoming
 
-- `weekly-review-flow` — next in queue, plan to be drafted
-- `retro-flow`
-- `export-json-cli`
+- `retro-flow` — implemented; fresh-context review pending
+- `export-json-cli` — final v1 slice before dogfood
 - v2-only AI roles (Coach / Historian / Scout / Principle mirror)
 - multi-user, cloud sync, mobile, and collaboration remain out of scope
