@@ -1,11 +1,11 @@
 # ExecPlan — export-json
 
-**Status:** drafted
+**Status:** closed
 **Owner (impl):** Codex
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-22
-**Closed:** —
-**Outcome:** —
+**Closed:** 2026-04-22
+**Outcome:** implemented + author verification green; ready for fresh-context review
 
 ## Goal
 
@@ -445,8 +445,14 @@ implementation escalates via the Blockers field of this document.
 
 ## Progress log
 
-- [M1] —
-- [M2] —
-- [M3] —
-- [M4] —
-- [M5] —
+- [M1] — `33d2b65`
+- [M2] — `24b4110`
+- [M3] — `fa1bb38`
+- [M4] — `de87403`
+- [M5] — current doc-sync close commit (reported in implementation handoff SHA)
+- 2026-04-22 — Manual smoke note: `/settings` still renders the
+  no-project sidebar state even after seeding projects, so step 7
+  switched projects on `/today` via `ProjectListActive` and then
+  returned to `/settings?project=...` for the final export. The
+  exported file still proved full-DB scope: 2 `daily_log` rows
+  across 2 project IDs.

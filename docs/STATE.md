@@ -4,55 +4,31 @@ Last updated: 2026-04-22
 
 ## Current Phase
 
-**`retro-flow` code slice is closed (2026-04-22) at approved head
-`9a52828`. The orthogonal local-runtime-DB repair chore ran
-2026-04-22 via drop + rebuild (Option B); `/retros`, `/retros?tab=weekly`,
-and `/today` all return 200 with no Prisma error against the real
-`DATABASE_URL`. `export-json-cli` — the final v1 slice — is now
-unblocked and awaiting scoping.**
+**`export-json` is closed (2026-04-22) at the current head; v1 is
+feature-complete per PRD §7 / §8.** `PRD.md` §10 now treats the
+Settings-page JSON export as the minimum v1 backup path. The new
+`web/lib/export/` layer builds a deterministic flat envelope over
+the eight user-authored tables plus `_prisma_migrations`, `/api/export`
+returns that envelope as pretty-printed JSON, and `/settings` now
+ships the browser-download button plus the restrained noun+number
+summary line. The implementation landed across `33d2b65` (M1 PRD
+edit), `24b4110` (M2 data + serializer), `fa1bb38` (M3 route +
+Settings button), `de87403` (M4 tests), and the current M5 doc-sync
+close.
 
-Fresh-context review at `9a52828` returned `approve` after three
-follow-up commits cleared an initial block: `PhaseRetroEntry.tsx`
-now uses `router.replace` instead of `window.location.href`
-(`fb2e98d`), `schema-roundtrip.test.ts` / `seed-cli.test.ts` retro
-fixtures were updated to the design-authoritative
-`{q1,q2,q3}` / `{change,reason}` shapes (`b2bdb9f`), and
-`web/vitest.config.ts` no longer excludes `lib/retro/**/*.ts` so
-the in-source `presentation.ts` / `metrics.ts` helper tests
-actually run (`d07ec1d`). Plan progress log + worktree cleanup
-landed in `9a52828`. Verification at close: 140/140 tests green,
-build / typecheck / lint green, `prisma migrate diff` empty
-against the committed schema, git status clean, seven-step manual
-smoke green on a temp-migrated DB, and repo grep confirmed no
-remaining `{kept,changed,killed}` or `{from,to}` retro fixtures.
+Verification for the author-close is green: `npm run build`,
+`npm run typecheck`, `npm run lint`, and `npm test` all passed,
+with the suite now at **155/155** tests. Manual smoke against
+`next start` and the real `web/prisma/dev.db` confirmed the empty-DB
+export path, byte-deterministic repeat export, `/today`-authored
+`daily_log` inclusion, and full-DB export across two projects.
 
-**The runtime-DB chore was orthogonal to the retro-flow code
-diff.** After review approval, Codex discovered that
-`web/prisma/dev.db` had never had `_prisma_migrations` populated
-— no prior slice's migration had actually been applied to that DB.
-Its existing rows were created via an earlier `prisma db push` or
-direct write. `retro-flow` was simply the first slice whose new
-column is queried by a default page render, so it was the first
-slice where the runtime drift manifested as a user-visible error
-(P2022 on opening `/retros` against the real DATABASE_URL). Prior
-slices had the same gap silently. See
-`docs/decisions/0002-schema-slice-runtime-probe.md` for the
-verifier-process fix that prevents a repeat.
-
-The chore ran 2026-04-22 via Option B (drop + rebuild): the
-pre-drop DB was dumped to `web/prisma/backups/dev.db.20260422-194951.sql`
-(gitignored), `dev.db` was removed, and `npx prisma migrate
-deploy` reapplied all four committed migrations from scratch
-against an empty DB. No seed: no canonical prod yaml exists — the
-Agentic 90-day yaml for dogfood is authored separately. Only
-in-repo change from the chore: `web/.gitignore` gained
-`prisma/backups/`. The runtime-probe rule from decision 0002 ran
-for the first time here and passed.
-
-The dogfood deadline is still **2026-05-03**. With
-`daily-log-flow`, `weekly-review-flow`, and `retro-flow`
-implemented and the local runtime baseline clean, `export-json-cli`
-is the final v1 slice before dogfood and is ready to scope.
+One surface quirk remains visible during smoke: `/settings` still
+renders the no-project sidebar state even after seeding projects, so
+the cross-project export proof switched projects on `/today` via
+`ProjectListActive` and then returned to `/settings?project=...` for
+the final export. Export correctness itself was unaffected; the final
+file contained two `daily_log` rows across two distinct project IDs.
 
 ## What Is True Now
 
@@ -63,7 +39,8 @@ is the final v1 slice before dogfood and is ready to scope.
 - `docs/decisions/0001-design-handoff-reference.md` still locks the visual system
 - `docs/plans/archive/` holds the closed `scaffold-and-schema`,
   `seed-cli`, `today-page-skeleton`, `knowledge-capture-inline`,
-  `daily-log-flow`, `weekly-review-flow`, and `retro-flow` plans
+  `daily-log-flow`, `weekly-review-flow`, `retro-flow`, and
+  `export-json` plans
 - `docs/decisions/0002-schema-slice-runtime-probe.md` adds two
   verifier steps (`prisma migrate status` + runtime probe against
   real DATABASE_URL) required for any schema-changing slice before
@@ -118,6 +95,16 @@ is the final v1 slice before dogfood and is ready to scope.
 - `web/components/shell/ProjectListActive.tsx` now preserves the current
   route and query state when switching projects, which unblocks `/retros`
   project-scoped manual smoke
+- `web/lib/export/` now holds the export slice data/presentation
+  layer: `shape.ts`, `collect.ts`, `serialize.ts`, and
+  `presentation.ts`
+- `web/app/api/export/route.ts` now returns the deterministic
+  pretty-printed export envelope as `application/json`
+- `web/components/settings/ExportJsonButton.tsx` now owns the
+  browser-download flow (`fetch` → `Blob` → `URL.createObjectURL`
+  → programmatic `<a download>`) and the restrained summary line
+- `web/app/settings/page.tsx` now replaces the settings placeholder
+  with the export surface
 - `web/components/today/RecentKnowledgeList.tsx` and
   `web/lib/today/relative-days.ts` light up `/today`'s `最近动静` block
 - `web/tests/knowledge-create.test.ts` covers direct server-action calls
@@ -145,6 +132,12 @@ is the final v1 slice before dogfood and is ready to scope.
   button, the read-only `昨日之承诺` block, and the surviving
   `未清账` / `阻塞` states in addition to the earlier Today-shell
   assertions
+- `web/tests/export-collect.test.ts`,
+  `web/tests/export-serialize.test.ts`,
+  `web/tests/export-presentation.test.ts`, and
+  `web/tests/settings-page.test.tsx` now cover the export envelope,
+  determinism contract, summary formatter, and `/settings`
+  download-trigger flow
 
 ### Runtime shape
 
@@ -170,46 +163,47 @@ Unchanged from the prior state:
 
 ## Verification Snapshot
 
-As of 2026-04-22 at `retro-flow` close (fresh-context review
-returned `approve` at head `9a52828`):
+As of 2026-04-22 at `export-json` author-close:
 
-- `cd web && npm run build` - green; `/knowledge`, `/retros`, and
-  `/today` build as dynamic routes, while `/`, `/_not-found`,
-  `/artifacts`, `/plan`, and `/settings` remain static
+- `cd web && npm run build` - green; `/api/export`, `/knowledge`,
+  `/retros`, and `/today` build as dynamic routes, while `/`,
+  `/_not-found`, `/artifacts`, `/plan`, and `/settings` remain static
 - `cd web && npm run typecheck` - green
 - `cd web && npm run lint` - green
-- `cd web && npm test` - green; 140/140 tests (the previously
-  excluded in-source tests for `web/lib/retro/presentation.ts` and
-  `web/lib/retro/metrics.ts` now run after `vitest.config.ts` was
-  un-excluded in `d07ec1d`)
-- `npx prisma migrate diff --from-migrations prisma/migrations
-  --to-schema prisma/schema.prisma --script --exit-code` — empty
-- `git status` — clean
-- Seven-step manual smoke green against a temp-migrated DB during
-  the review pass: phase-default eligible state, submit validation
-  bounce to step 2, current-segment create, committed-card render,
-  previous-phase score reference line without prefill, cross-project
-  rerendering on `/retros`, and the weekly-tab surface staying intact
-  after the phase-default flip.
-
-**Real-runtime baseline (added 2026-04-22 post-chore):**
-
-- `npx prisma migrate status` against the real `DATABASE_URL` —
+- `cd web && npm test` - green; **155/155** tests, including the new
+  export in-source helpers and the four M4 export test files
+- `npx prisma migrate status` against the real `DATABASE_URL` -
   "Database schema is up to date!" with all four committed
   migrations applied
-- `npx prisma migrate diff --from-config-datasource --to-schema
-  prisma/schema.prisma` — "No difference detected"
-- `next start` + HTTP probe: `/retros` → 200, `/retros?tab=weekly`
-  → 200, `/today` → 200; server stdout/stderr clean of
-  P2022 / Prisma / Error / Unhandled / Exception
+- Seven-step manual smoke against `next start` + the real
+  `web/prisma/dev.db`:
+  1. `/settings` rendered the `设置` page head with a visible enabled
+     `导出 JSON` button
+  2. the button produced `study-system-<ISO>.json` downloads in the
+     Playwright browser session
+  3. the summary line rendered neutral noun+number copy only
+  4. the downloaded file kept the locked top-level/table key order,
+     2-space pretty-print, trailing newline, and 4 migration rows
+     matching `npx prisma migrate status`
+  5. a second export differed only in `exported_at`
+  6. one `daily_log` authored via `/today` appeared as exactly one row
+     in `tables.daily_log`, and the summary line showed `1 份日志`
+  7. after switching to the second project on `/today` via
+     `ProjectListActive`, exporting from `/settings?project=...`
+     still produced two `daily_log` rows across two project IDs,
+     proving full-DB export rather than project-scoped export
 
 ## Known Open Questions
 
-- `export-json-cli` is still required before dogfood trust per PRD §10
 - the Today fact-strip's `累计 commits` read remains parked even though
   `knowledge-capture-inline` now writes `Artifact(kind = "commit")`
 - global `N` routing and Tweaks-axis resurrection remain parked until
   dogfood proves them necessary
+- `/settings` still renders the no-project sidebar state even when
+  projects exist, so project switching for the export smoke had to run
+  on `/today` and then return to `/settings?project=...`. Decide
+  post-dogfood whether this is a shell bug or belongs under Settings
+  polish.
 - `npm run typecheck` on a clean workspace can fail once on missing
   `.next/types/routes.js` before `next build` runs. Next.js 16
   generated-types artifact, not a product defect. Verifier order is
@@ -222,17 +216,12 @@ returned `approve` at head `9a52828`):
 
 ## Recommended Next Step
 
-**Hand `export-json` to Codex.** Plan drafted at
-`docs/plans/export-json.md` (2026-04-22). PM Q1–Q8 resolved: the
-slice delivers a Settings-page「导出 JSON」button (not a CLI),
-browser-downloads a flat envelope JSON file containing the eight
-user-authored tables plus `_prisma_migrations` as a version
-marker, byte-deterministic per-DB, with a restrained one-line UI
-summary after download. M1 is a one-line edit to PRD §10 relaxing
-the literal "CLI" wording; the CLI form moves to v1.1 backlog.
-No schema change, so decision 0002's two extra verifier lines do
-not apply. This is the final v1 slice before the 2026-05-03
-dogfood deadline.
+**Run fresh-context review on `export-json`, then start dogfood on
+2026-05-03 if no blocking findings appear.** Product-side next work
+is no longer a must-land v1 feature slice; it is post-dogfood triage.
+The standing v1.1 backlog is now the CLI form of export, Settings
+page polish (including project-context parity on `/settings`), auto-
+backup scheduling, and the reverse-direction import/restore slice.
 
 ## Blockers
 
@@ -240,12 +229,10 @@ None.
 
 ## Deferred / Upcoming
 
-- `export-json` — plan drafted 2026-04-22, awaiting Codex handoff;
-  final v1 slice before dogfood
 - v1.1 backlog (post-dogfood):
   - CLI form of the JSON export
-  - Settings page UX polish: DB path / size readouts, the parked
-    「导入 YAML」 /「打开目录」 buttons
+  - Settings page UX polish: DB path / size readouts, project-context
+    parity on `/settings`, and the parked 「导入 YAML」 /「打开目录」 buttons
   - Auto-scheduled backup (picks up the "last backup / next
     auto-backup" copy from the design mockup)
   - Import / restore slice (reverse direction of `export-json`)
