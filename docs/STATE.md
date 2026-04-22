@@ -4,20 +4,17 @@ Last updated: 2026-04-22
 
 ## Current Phase
 
-**`daily-log-flow` v2 implementation complete; fresh-context review pending.**
+**`weekly-review-flow` implementation is complete (2026-04-22);
+fresh-context review is pending.**
 
-The v2 rework replaced the inline compose card and `[记为未清账]`
-carry-forward button with the four-step `EndOfDayWizard` launched from
-the page-head `今日收工 ⌘↵` / `修改今日 ⌘↵` button. `昨日之承诺` now
-renders as a read-only quoted block with the `未兑现` label, and
-`未清账` rows now show `+Nd` overdue badges.
-
-`upsertDailyLog` / OpenItem / Blocker actions remain the server write
-path. `OpenItem` + `Blocker` blocks still keep `+ 新增` and
-close/resolve actions per PM-Q3 γ (explicit deviation from design,
-documented in the plan). Verification has been rerun on the v2 shape,
-including the wizard flow, read-only promise block, overdue badge,
-blocker resolve, and project-switch scoping smoke checks.
+The `/retros` placeholder has been replaced with the live weekly-review
+surface: page-head `本周复盘 ⌘↵` / `修改本周 ⌘↵`, `阶段复盘` placeholder
+tab, weekly modal write path, read-only weekly card list, previous-week
+Q6 reference line for Q4, and server-side weekly upsert/revalidation.
+All four anti-patterns still pass. Verification at close: `build`,
+`typecheck`, `lint`, and `test` are green; `/retros` now builds as a
+dynamic route; a `next start` preview against a temp SQLite DB covered
+all six weekly-review smoke items.
 
 The preceding `knowledge-capture-inline` slice remains in place:
 `/knowledge` stays the primary inline capture surface for
@@ -36,11 +33,11 @@ The dogfood deadline is still **2026-05-03**. With
 - `AGENTS.md` + `web/AGENTS.md` remain the operating contract and command map
 - `docs/decisions/0001-design-handoff-reference.md` still locks the visual system
 - `docs/plans/archive/` holds the closed `scaffold-and-schema`,
-  `seed-cli`, `today-page-skeleton`, and `knowledge-capture-inline`
-  plans
-- `docs/plans/daily-log-flow.md` remains the active slice plan and now
-  records v2 implementation progress through M8, with M9 doc sync in
-  this change and fresh-context review next
+  `seed-cli`, `today-page-skeleton`, `knowledge-capture-inline`, and
+  `daily-log-flow` plans
+- `docs/plans/weekly-review-flow.md` remains the current execution
+  record and now carries the M1–M4 progress log entries plus the
+  M5 handoff note
 - `web/lib/knowledge/` now holds the knowledge slice server/data layer:
   `queries.ts`, `slug.ts`, `artifact-kind.ts`, and `actions.ts`
 - `web/components/knowledge/` now holds the knowledge slice UI
@@ -57,13 +54,27 @@ The dogfood deadline is still **2026-05-03**. With
   `wizard/Step2SkippedList`, `wizard/Step3TimeInput`,
   `wizard/Step4TomorrowNote`, the read-only
   `YesterdayPromiseBlock`, the overdue-badge `OpenItemsBlock`, and the
-  existing open-item/blocker inline action children
+  existing open-item/blocker inline action children;
+  `web/lib/daily-log/wizard-state.ts` holds the pure step1/step2
+  derivation helpers reviewed in the fresh-context pass
 - the superseded `DailyLogCompose`, `DailyLogSummary`,
   `CarryForwardButton`, and `ChipEditor` files have been deleted
 - `web/app/today/page.tsx` now wires the wizard into the `.page-head`,
   keeps the `今日 · {ISO}` plan block read-only, renders the read-only
   `昨日之承诺` block in the left column, and keeps `最近动静`,
   `未清账`, and `阻塞` project-scoped
+- `web/lib/weekly-log/` now holds the weekly slice data/presentation
+  layer: `presentation.ts`, `queries.ts`, `actions.ts`, and `copy.ts`
+- `web/components/weekly/` now holds the weekly slice UI primitives:
+  `WeeklyReviewEntry`, `WeeklyReviewModal`, `WeeklyScoresRow`, and the
+  server-safe `WeeklyLogCard`
+- `web/app/retros/page.tsx` now replaces the placeholder with the live
+  weekly tab plus the phase-placeholder tab
+- `web/lib/schemas/weekly-log.ts` now enforces trimmed required
+  `reflections.q1..q6` answers with neutral Chinese validation copy
+- `web/components/shell/ProjectListActive.tsx` now preserves the current
+  route and query state when switching projects, which unblocks `/retros`
+  project-scoped manual smoke
 - `web/components/today/RecentKnowledgeList.tsx` and
   `web/lib/today/relative-days.ts` light up `/today`'s `最近动静` block
 - `web/tests/knowledge-create.test.ts` covers direct server-action calls
@@ -76,6 +87,11 @@ The dogfood deadline is still **2026-05-03**. With
   `web/tests/open-items-actions.test.ts`, and
   `web/tests/blockers-actions.test.ts` cover the surviving server
   actions against temp SQLite DBs
+- `web/tests/weekly-log-upsert.test.ts` covers weekly upsert behavior
+  and validation against a temp SQLite DB
+- `web/tests/retros-page.test.tsx` renders `/retros` through RTL and
+  covers empty states, current/previous-week button state, and the
+  phase placeholder
 - `web/tests/today-page.test.tsx` now covers the page-head `今日收工`
   button, the read-only `昨日之承诺` block, and the surviving
   `未清账` / `阻塞` states in addition to the earlier Today-shell
@@ -105,23 +121,20 @@ Unchanged from the prior state:
 
 ## Verification Snapshot
 
-As of 2026-04-22 after `daily-log-flow` v2 implementation:
+As of 2026-04-22 at `weekly-review-flow` close (author verification,
+pre fresh-context review):
 
+- `cd web && npm run build` - green; `/knowledge`, `/retros`, and
+  `/today` build as dynamic routes, while `/`, `/_not-found`,
+  `/artifacts`, `/plan`, and `/settings` remain static
 - `cd web && npm run typecheck` - green
 - `cd web && npm run lint` - green
-- `cd web && npm test` - green; 106 tests
-- `cd web && npm run build` - green; `/knowledge` and `/today` build as
-  dynamic routes, while `/`, `/_not-found`, `/artifacts`, `/plan`,
-  `/retros`, and `/settings` remain static
-- Manual smoke against a seeded temp SQLite DB - green for plan items
-  1-6 on the built app (`next start` preview): fresh-day wizard create,
-  edit/update of the same row, read-only `昨日之承诺` + step-2 prefill,
-  `+10d` drift badge, blocker resolve, and cross-project scoping all
-  passed
-- Note: the plan asked for `npm run dev` smoke, but this workspace
-  already had a separate `next dev` process holding the repo lock, so
-  the preview was run on `next start` against the fresh production
-  build instead
+- `cd web && npm test` - green; 119 tests
+- Manual smoke on a `next start` preview against
+  `web/prisma/manual-smoke-weekly-flow.db` covered all six weekly-review
+  items: weekly-tab empty state, submit validation, current-week create,
+  current-week edit, previous-week Q6 reference line, phase placeholder,
+  and cross-project rerendering on `/retros`
 
 ## Known Open Questions
 
@@ -130,14 +143,20 @@ As of 2026-04-22 after `daily-log-flow` v2 implementation:
   `knowledge-capture-inline` now writes `Artifact(kind = "commit")`
 - global `N` routing and Tweaks-axis resurrection remain parked until
   dogfood proves them necessary
+- `npm run typecheck` on a clean workspace can fail once on missing
+  `.next/types/routes.js` before `next build` runs. Next.js 16
+  generated-types artifact, not a product defect. Verifier order is
+  `build → typecheck` (or prepend `next typegen`). Revisit if any
+  slice's verification step trips on it.
 
 ## Recommended Next Step
 
-**Open the fresh-context review session for `daily-log-flow` v2.**
-Review focus: wizard surface contract compliance, anti-pattern
-compliance (especially restrained submit/complete states), the
-read-only `昨日之承诺` shape, overdue badge rendering, and clean
-deletion of the superseded inline-compose / carry-forward surfaces.
+**Open the fresh-context review for `weekly-review-flow`.** Implementation
+is landed and verified; the next useful step is a diff-focused Codex
+review against `main` using `docs/code_review.md`.
+
+After that: `retro-flow`, then `export-json-cli` before the
+2026-05-03 dogfood deadline.
 
 ## Blockers
 
@@ -145,7 +164,7 @@ None.
 
 ## Deferred / Upcoming
 
-- `weekly-review-flow`
+- `weekly-review-flow` — next in queue, plan to be drafted
 - `retro-flow`
 - `export-json-cli`
 - v2-only AI roles (Coach / Historian / Scout / Principle mirror)

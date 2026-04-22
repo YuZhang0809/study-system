@@ -126,11 +126,11 @@ describe("upsertWeeklyLog", () => {
 
   it("returns field errors when weekStart is missing", async () => {
     const project = await seedProject("Weekly Missing Date Project");
-    const input: any = {
+    const input = {
       projectId: project.id,
       reflections: buildReflections(),
       selfScores: buildScores(),
-    };
+    } as unknown as Parameters<typeof upsertWeeklyLog>[0];
 
     const result = await upsertWeeklyLog(input);
 

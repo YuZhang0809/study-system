@@ -58,12 +58,22 @@ export default async function RetrosPage({ searchParams }: RetrosPageProps) {
         />
       </div>
 
-      <div className="pillbar">
-        <a className="pill" aria-selected={activeTab === "phase"} href={buildRetrosHref(project.id, "phase")}>
+      <div className="pillbar" role="tablist" aria-label="复盘视图">
+        <a
+          className="pill"
+          role="tab"
+          aria-selected={activeTab === "phase"}
+          href={buildRetrosHref(project.id, "phase")}
+        >
           <span className="caps">阶段复盘</span>
           <span className="n num">{phaseRetroCount}</span>
         </a>
-        <a className="pill" aria-selected={activeTab === "weekly"} href={buildRetrosHref(project.id, "weekly")}>
+        <a
+          className="pill"
+          role="tab"
+          aria-selected={activeTab === "weekly"}
+          href={buildRetrosHref(project.id, "weekly")}
+        >
           <span className="caps">周记</span>
           <span className="n num">{weeklyLogs.length}</span>
         </a>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { SidebarProject } from "@/lib/today/active-project";
 
 interface ProjectListActiveProps {
@@ -8,6 +8,7 @@ interface ProjectListActiveProps {
 }
 
 export function ProjectListActive({ projects }: ProjectListActiveProps) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedId = searchParams.get("project");
   const activeProjectId = projects.some((project) => project.id === requestedId)
@@ -19,7 +20,7 @@ export function ProjectListActive({ projects }: ProjectListActiveProps) {
       {projects.map((project) => (
         <li key={project.id}>
           <a
-            href={`/today?project=${project.id}`}
+            href={buildProjectHref(pathname, searchParams, project.id)}
             className="proj-item"
             aria-current={activeProjectId === project.id ? "page" : undefined}
           >
@@ -29,4 +30,12 @@ export function ProjectListActive({ projects }: ProjectListActiveProps) {
       ))}
     </ul>
   );
+}
+
+function buildProjectHref(pathname: string, searchParams: ReturnType<typeof useSearchParams>, projectId: string): string {
+  const nextSearchParams = new URLSearchParams(searchParams.toString());
+  nextSearchParams.set("project", projectId);
+
+  const query = nextSearchParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
