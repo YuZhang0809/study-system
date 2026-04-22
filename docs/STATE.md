@@ -4,31 +4,30 @@ Last updated: 2026-04-22
 
 ## Current Phase
 
-**`export-json` is closed (2026-04-22) at the current head; v1 is
-feature-complete per PRD §7 / §8.** `PRD.md` §10 now treats the
+**`export-json` is closed (2026-04-22) at approved head `e1a1ab3`;
+v1 is feature-complete per PRD §7 / §8. Next action is dogfood
+prep for the 2026-05-03 Day-1 start.** Fresh-context review
+returned `approve` with zero blockers and zero nits; one v1.1
+follow-up was captured (the `/settings` no-project sidebar state
+— see Known Open Questions). `PRD.md` §10 now treats the
 Settings-page JSON export as the minimum v1 backup path. The new
 `web/lib/export/` layer builds a deterministic flat envelope over
 the eight user-authored tables plus `_prisma_migrations`, `/api/export`
-returns that envelope as pretty-printed JSON, and `/settings` now
+returns that envelope as pretty-printed JSON, and `/settings`
 ships the browser-download button plus the restrained noun+number
 summary line. The implementation landed across `33d2b65` (M1 PRD
 edit), `24b4110` (M2 data + serializer), `fa1bb38` (M3 route +
-Settings button), `de87403` (M4 tests), and the current M5 doc-sync
-close.
+Settings button), `de87403` (M4 tests), and `e1a1ab3` (M5 doc
+sync).
 
-Verification for the author-close is green: `npm run build`,
+Verification at the approved head is green: `npm run build`,
 `npm run typecheck`, `npm run lint`, and `npm test` all passed,
 with the suite now at **155/155** tests. Manual smoke against
 `next start` and the real `web/prisma/dev.db` confirmed the empty-DB
 export path, byte-deterministic repeat export, `/today`-authored
 `daily_log` inclusion, and full-DB export across two projects.
-
-One surface quirk remains visible during smoke: `/settings` still
-renders the no-project sidebar state even after seeding projects, so
-the cross-project export proof switched projects on `/today` via
-`ProjectListActive` and then returned to `/settings?project=...` for
-the final export. Export correctness itself was unaffected; the final
-file contained two `daily_log` rows across two distinct project IDs.
+Reviewer-side verifiers (`npm run build` / `typecheck` / `lint` /
+`test` / `npm test -- lib/export`) re-ran green independently.
 
 ## What Is True Now
 
@@ -163,7 +162,8 @@ Unchanged from the prior state:
 
 ## Verification Snapshot
 
-As of 2026-04-22 at `export-json` author-close:
+As of 2026-04-22 at `export-json` fresh-context review approval
+(head `e1a1ab3`):
 
 - `cd web && npm run build` - green; `/api/export`, `/knowledge`,
   `/retros`, and `/today` build as dynamic routes, while `/`,
@@ -216,12 +216,31 @@ As of 2026-04-22 at `export-json` author-close:
 
 ## Recommended Next Step
 
-**Run fresh-context review on `export-json`, then start dogfood on
-2026-05-03 if no blocking findings appear.** Product-side next work
-is no longer a must-land v1 feature slice; it is post-dogfood triage.
-The standing v1.1 backlog is now the CLI form of export, Settings
-page polish (including project-context parity on `/settings`), auto-
-backup scheduling, and the reverse-direction import/restore slice.
+**Dogfood prep for 2026-05-03 Day-1 start.** The last v1 slice is
+approved and closed; no more must-land feature work before dogfood.
+Concrete PM-side tasks between now (2026-04-22) and 2026-05-03:
+
+1. **Author the Agentic 90-day plan yaml** (90 days × 3 phases,
+   per PRD §8 acceptance list). This is user-authored content;
+   Claude can review structure/shape against the seed-cli yaml
+   contract but does not write the plan itself (anti-pattern #4
+   — not a planner).
+2. **`npm run seed -- <plan.yaml>`** against the clean
+   `web/prisma/dev.db` (rebuilt 2026-04-22 per decision 0002
+   fallout). This becomes the dogfood baseline DB.
+3. **Day-0 dry-run smoke** against the seeded DB: `/today` /
+   `/plan` / `/knowledge` / `/retros` / `/settings` all render,
+   driving-seat block renders expected Day 1 content, first
+   `daily_log` can be written, first `knowledge_item` can be
+   captured, Settings-page export downloads a plausible first
+   backup.
+4. **Ship a first backup file to git** (or wherever the user
+   wants durable storage) as the Day-0 reference. This is the
+   immediate payoff of shipping `export-json` — proof the backup
+   path works before dogfood actually starts generating data.
+
+Standing v1.1 backlog (post-dogfood) remains as listed under
+Deferred / Upcoming below.
 
 ## Blockers
 

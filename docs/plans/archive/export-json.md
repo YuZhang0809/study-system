@@ -5,7 +5,11 @@
 **Owner (PM):** Claude / human PM
 **Opened:** 2026-04-22
 **Closed:** 2026-04-22
-**Outcome:** implemented + author verification green; ready for fresh-context review
+**Outcome:** fresh-context review returned `approve` at head
+`e1a1ab3` — zero blockers, zero nits, one v1.1 follow-up captured
+(the `/settings` no-project sidebar state, tracked under
+`docs/STATE.md` Known Open Questions + Deferred / Upcoming). v1
+is feature-complete per PRD §7 / §8.
 
 ## Goal
 
@@ -449,10 +453,18 @@ implementation escalates via the Blockers field of this document.
 - [M2] — `24b4110`
 - [M3] — `fa1bb38`
 - [M4] — `de87403`
-- [M5] — current doc-sync close commit (reported in implementation handoff SHA)
+- [M5] — `e1a1ab3`
 - 2026-04-22 — Manual smoke note: `/settings` still renders the
   no-project sidebar state even after seeding projects, so step 7
   switched projects on `/today` via `ProjectListActive` and then
   returned to `/settings?project=...` for the final export. The
   exported file still proved full-DB scope: 2 `daily_log` rows
-  across 2 project IDs.
+  across 2 project IDs. Filed as v1.1 follow-up.
+- 2026-04-22 — Fresh-context review: `approve`. Reviewer
+  independently re-ran `npm run build`, `npm run typecheck`,
+  `npm run lint`, `npm test` (155), and `npm test -- lib/export`
+  (4 files / 7 tests confirmed actually collected). Scope-
+  discipline checks all green: no `web/prisma/` diff, no
+  dep drift, no `surfaces.ts` / shell-nav drift, exactly one
+  `vitest.config.ts` `includeSource` line for `lib/export/**/*.ts`,
+  exactly one PRD line-295 bullet change.
