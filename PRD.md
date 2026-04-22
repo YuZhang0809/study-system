@@ -292,7 +292,7 @@ Claude Design 已交付完整 handoff，落盘在
 ## 10. 附：风险与红线
 
 ### 技术风险
-- **数据丢失**：本地 SQLite 需要定时备份机制（v1 至少有导出 JSON 的 CLI）
+- **数据丢失**：本地 SQLite 需要定时备份机制（v1 至少有 JSON 导出路径；2026-04-22 定在 Settings 页「导出 JSON」按钮，CLI 形态作为 v1.1 backlog）
 - **schema 漂移**：Prisma migration 必须严格执行，每次改 schema 都写 migration
 
 ### 产品风险
